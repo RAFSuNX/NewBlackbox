@@ -1,9 +1,8 @@
-name: Build and Send APK to Telegram
+name: Build and Send to Telegram
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,155 +12,81 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
-          cache: 'gradle'
+          cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+      - name: Accept SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
-
-      - name: Build APKs and AARs
-        run: ./gradlew assembleDebug assembleRelease :Bcore:assembleDebug :Bcore:assembleRelease :black-reflection:assemble :compiler:assemble
-
-      - name: Find Bcore AAR paths
-        id: aar_paths
+      - name: Decode keystore
         run: |
-          DEBUG_AAR=$(find ./Bcore/build/outputs/aar -name "*debug.aar" | head -n 1)
-          RELEASE_AAR=$(find ./Bcore/build/outputs/aar -name "*release.aar" | head -n 1)
-          echo "debug_aar_path=$DEBUG_AAR" >> $GITHUB_OUTPUT
-          echo "release_aar_path=$RELEASE_AAR" >> $GITHUB_OUTPUT
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/blackbox-release.jks
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/blackbox-release.jks" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
 
-      - name: Find black-reflection and compiler artifact paths
-        id: additional_artifacts
+      - name: Build signed APKs and AARs
         run: |
-          BLACK_REFLECTION_ART=$(find ./black-reflection/build/libs ./black-reflection/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -n 1)
-          COMPILER_ART=$(find ./compiler/build/libs ./compiler/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -n 1)
-          echo "black_reflection_path=$BLACK_REFLECTION_ART" >> $GITHUB_OUTPUT
-          echo "compiler_path=$COMPILER_ART" >> $GITHUB_OUTPUT
+          chmod +x ./gradlew
+          ./gradlew assembleDebug assembleRelease \
+            :Bcore:assembleDebug :Bcore:assembleRelease \
+            :black-reflection:assemble :compiler:assemble
 
-      - name: Send Bcore Debug AAR to Telegram and Pin
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          AAR_PATH="${{ steps.aar_paths.outputs.debug_aar_path }}"
-          if [ -n "$AAR_PATH" ] && [ -f "$AAR_PATH" ]; then
-            RESPONSE=$(curl -s -F document=@"$AAR_PATH" \
-                 -F chat_id="$TELEGRAM_CHAT_ID" \
-                 -F caption="[Bcore DEBUG AAR] $COMMIT_MSG" \
-                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-            if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-              curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" \
-                -d message_id="$MESSAGE_ID"
-            fi
-          else
-            echo "Debug AAR not found at $AAR_PATH"
-          fi
-
-      - name: Send Bcore Release AAR to Telegram and Pin
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          AAR_PATH="${{ steps.aar_paths.outputs.release_aar_path }}"
-          if [ -n "$AAR_PATH" ] && [ -f "$AAR_PATH" ]; then
-            RESPONSE=$(curl -s -F document=@"$AAR_PATH" \
-                 -F chat_id="$TELEGRAM_CHAT_ID" \
-                 -F caption="[Bcore RELEASE AAR] $COMMIT_MSG" \
-                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-            if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-              curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" \
-                -d message_id="$MESSAGE_ID"
-            fi
-          else
-            echo "Release AAR not found at $AAR_PATH"
-          fi
-
-      - name: Send black-reflection Artifact to Telegram and Pin
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          ART_PATH="${{ steps.additional_artifacts.outputs.black_reflection_path }}"
-          if [ -n "$ART_PATH" ] && [ -f "$ART_PATH" ]; then
-            FILENAME=$(basename "$ART_PATH")
-            RESPONSE=$(curl -s -F document=@"$ART_PATH" \
-                 -F chat_id="$TELEGRAM_CHAT_ID" \
-                 -F caption="[black-reflection] $FILENAME - $COMMIT_MSG" \
-                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-            if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-              curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" \
-                -d message_id="$MESSAGE_ID"
-            fi
-          else
-            echo "black-reflection artifact not found at $ART_PATH"
-          fi
-
-      - name: Send compiler Artifact to Telegram and Pin
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          ART_PATH="${{ steps.additional_artifacts.outputs.compiler_path }}"
-          if [ -n "$ART_PATH" ] && [ -f "$ART_PATH" ]; then
-            FILENAME=$(basename "$ART_PATH")
-            RESPONSE=$(curl -s -F document=@"$ART_PATH" \
-                 -F chat_id="$TELEGRAM_CHAT_ID" \
-                 -F caption="[compiler] $FILENAME - $COMMIT_MSG" \
-                 https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-            if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-              curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                -d chat_id="$TELEGRAM_CHAT_ID" \
-                -d message_id="$MESSAGE_ID"
-            fi
-          else
-            echo "compiler artifact not found at $ART_PATH"
-          fi
-
-      - name: Send ALL Debug APKs to Telegram and Pin
+      - name: Send debug APKs to Telegram
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           for APK in ./app/build/outputs/apk/debug/*.apk; do
-            if [ -f "$APK" ]; then
-              RESPONSE=$(curl -s -F document=@"$APK" \
-                   -F chat_id="$TELEGRAM_CHAT_ID" \
-                   -F caption="[DEBUG] $(basename $APK) $COMMIT_MSG" \
-                   https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-              MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-              if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-                curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                  -d chat_id="$TELEGRAM_CHAT_ID" \
-                  -d message_id="$MESSAGE_ID"
-              fi
-            fi
+            [ -f "$APK" ] || continue
+            RESPONSE=$(curl -s -F document=@"$APK" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="[DEBUG] $(basename $APK) | $COMMIT_MSG" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
+            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
+            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
           done
 
-      - name: Send ALL Release APKs to Telegram and Pin
+      - name: Send release APKs to Telegram
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
           for APK in ./app/build/outputs/apk/release/*.apk; do
-            if [ -f "$APK" ]; then
-              RESPONSE=$(curl -s -F document=@"$APK" \
-                   -F chat_id="$TELEGRAM_CHAT_ID" \
-                   -F caption="[RELEASE] $(basename $APK) $COMMIT_MSG" \
-                   https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-              MESSAGE_ID=$(echo $RESPONSE | jq '.result.message_id')
-              if [ "$MESSAGE_ID" != "null" ] && [ -n "$MESSAGE_ID" ]; then
-                curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-                  -d chat_id="$TELEGRAM_CHAT_ID" \
-                  -d message_id="$MESSAGE_ID"
-              fi
-            fi
+            [ -f "$APK" ] || continue
+            RESPONSE=$(curl -s -F document=@"$APK" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="[RELEASE SIGNED] $(basename $APK) | $COMMIT_MSG" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
+            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
+            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
           done
 
+      - name: Send Bcore AARs to Telegram
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          for AAR in $(find ./Bcore/build/outputs/aar -name "*.aar" 2>/dev/null); do
+            [ -f "$AAR" ] || continue
+            curl -s -F document=@"$AAR" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="[Bcore AAR] $(basename $AAR) | $COMMIT_MSG" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument > /dev/null
+          done
+
+      - name: Send black-reflection and compiler to Telegram
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          for ART in \
+            $(find ./black-reflection/build/libs ./black-reflection/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -1) \
+            $(find ./compiler/build/libs ./compiler/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -1); do
+            [ -f "$ART" ] || continue
+            curl -s -F document=@"$ART" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="[$(basename $(dirname $ART))] $(basename $ART) | $COMMIT_MSG" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument > /dev/null
+          done
