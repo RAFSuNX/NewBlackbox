@@ -10,34 +10,14 @@ object AppManager {
     private const val TAG = "AppManager"
 
     @JvmStatic
-    val mBlackBoxLoader by lazy {
-        try {
-            BlackBoxLoader()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creating BlackBoxLoader: ${e.message}")
-
-            BlackBoxLoader() 
-        }
-    }
+    val mBlackBoxLoader by lazy { BlackBoxLoader() }
 
     @JvmStatic
-    val mBlackBoxCore by lazy {
-        try {
-            mBlackBoxLoader.getBlackBoxCore()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting BlackBoxCore: ${e.message}")
-            throw e 
-        }
-    }
+    val mBlackBoxCore by lazy { mBlackBoxLoader.getBlackBoxCore() }
 
     @JvmStatic
     val mRemarkSharedPreferences: SharedPreferences by lazy {
-        try {
-            App.getContext().getSharedPreferences("UserRemark", Context.MODE_PRIVATE)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creating SharedPreferences: ${e.message}")
-            throw e 
-        }
+        App.getContext().getSharedPreferences("UserRemark", Context.MODE_PRIVATE)
     }
 
     fun doAttachBaseContext(context: Context) {
@@ -46,7 +26,6 @@ object AppManager {
             mBlackBoxLoader.addLifecycleCallback()
         } catch (e: Exception) {
             Log.e(TAG, "Error in doAttachBaseContext: ${e.message}")
-            
         }
     }
 
@@ -56,16 +35,9 @@ object AppManager {
             initThirdService(context)
         } catch (e: Exception) {
             Log.e(TAG, "Error in doOnCreate: ${e.message}")
-            
         }
     }
 
     private fun initThirdService(context: Context) {
-        try {
-            
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in initThirdService: ${e.message}")
-        }
     }
 }
