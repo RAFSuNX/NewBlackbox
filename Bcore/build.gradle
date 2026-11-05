@@ -10,8 +10,6 @@ android {
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
     buildFeatures {
         aidl true
-    }
-    buildFeatures {
         prefab true
     }
     defaultConfig {
