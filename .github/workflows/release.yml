@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+
+      - name: Accept SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Compute version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF_NAME}            # e.g. v4.1.0
+          NAME=${TAG#v}                     # e.g. 4.1.0
+          MAJOR=$(echo $NAME | cut -d. -f1)
+          MINOR=$(echo $NAME | cut -d. -f2)
+          PATCH=$(echo $NAME | cut -d. -f3)
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          echo "version_name=$NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$CODE" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/blackbox-release.jks
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/blackbox-release.jks" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+
+      - name: Build signed release APKs
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease \
+            -PversionName="${{ steps.version.outputs.version_name }}" \
+            -PversionCode="${{ steps.version.outputs.version_code }}"
+
+      - name: Collect APKs
+        id: apks
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk dist/
+          ls dist/
+          echo "files=$(ls dist/*.apk | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -v "^${{ steps.version.outputs.tag }}$" | head -1)
+          if [ -n "$PREV" ]; then
+            NOTES=$(git log ${PREV}..${{ steps.version.outputs.tag }} --pretty="- %s" --no-merges)
+          else
+            NOTES=$(git log --pretty="- %s" --no-merges | head -20)
+          fi
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "BlackBox ${{ steps.version.outputs.version_name }}"
+          body: |
+            ## What's Changed
+            ${{ steps.notes.outputs.notes }}
+
+            ---
+            **Version:** `${{ steps.version.outputs.version_name }}` (code `${{ steps.version.outputs.version_code }}`)
+            **Min SDK:** Android 5.0 (API 21)
+            **Target SDK:** Android 14 (API 34)
+          files: dist/*.apk
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version_name, '-') }}
+
+      - name: Send signed APKs to Telegram
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VER="${{ steps.version.outputs.version_name }}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          for APK in dist/*.apk; do
+            [ -f "$APK" ] || continue
+            RESPONSE=$(curl -s -F document=@"$APK" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="$(printf '[RELEASE v%s SIGNED]\n%s\n\n%s' "$VER" "$(basename $APK)" "$RELEASE_URL")" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
+            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
+            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
+          done
