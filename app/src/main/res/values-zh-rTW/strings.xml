@@ -62,4 +62,18 @@
     <string name="disable_gms">禁用服務</string>
     <string name="disable_gms_hint">清除當前的穀歌服務環境？ 穀歌服務數據將被清除。</string>
     <string name="no_gms">現時，手機上沒有穀歌服務環境。</string>
+    <string name="unknown_app">未知應用程式</string>
+    <string name="add_app">安裝應用程式</string>
+    <string name="error_load">載入失敗，點擊重試</string>
+    <string name="app_icon_desc">%s 的圖示</string>
+    <string name="hide_root_summary">防止沙盒內的應用程式偵測到裝置已Root</string>
+    <string name="daemon_enable_summary">BlackBox進入背景時保持虛擬應用程式運行</string>
+    <string name="send_logs">傳送日誌</string>
+    <string name="send_logs_summary">上傳除錯日誌以協助診斷問題</string>
+    <string name="send_logs_sending">正在傳送日誌…</string>
+    <string name="version_info">版本</string>
+    <string name="use_vpn_network">使用VPN網路</string>
+    <string name="use_vpn_network_summary">透過VPN路由沙盒應用程式的流量（可改善網路存取）</string>
+    <string name="disable_flag_secure">停用Flag Secure</string>
+    <string name="disable_flag_secure_summary">允許在應用程式內截圖和錄影</string>
 </resources>
