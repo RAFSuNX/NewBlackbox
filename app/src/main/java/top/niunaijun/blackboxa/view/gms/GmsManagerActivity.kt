@@ -3,11 +3,12 @@ package top.niunaijun.blackboxa.view.gms
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import com.google.android.material.switchmaterial.SwitchMaterial
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import cbfg.rvadapter.RVAdapter
 import com.afollestad.materialdialogs.MaterialDialog
+import com.google.android.material.switchmaterial.SwitchMaterial
+import top.niunaijun.blackbox.BlackBoxCore
 import top.niunaijun.blackboxa.R
 import top.niunaijun.blackboxa.bean.GmsBean
 import top.niunaijun.blackboxa.databinding.ActivityGmsBinding
@@ -16,21 +17,24 @@ import top.niunaijun.blackboxa.util.inflate
 import top.niunaijun.blackboxa.util.toast
 import top.niunaijun.blackboxa.view.base.LoadingActivity
 
-
 class GmsManagerActivity : LoadingActivity() {
 
     private lateinit var viewModel: GmsViewModel
-
     private lateinit var mAdapter: RVAdapter<GmsBean>
-
     private val viewBinding: ActivityGmsBinding by inflate()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(viewBinding.root)
         initToolbar(viewBinding.toolbarLayout.toolbar, R.string.gms_manager, true)
-        initViewModel()
 
+        if (!BlackBoxCore.get().isSupportGms) {
+            toast(R.string.no_gms)
+            finish()
+            return
+        }
+
+        initViewModel()
         initRecyclerView()
     }
 
@@ -40,34 +44,34 @@ class GmsManagerActivity : LoadingActivity() {
 
         viewModel.mInstalledLiveData.observe(this) {
             hideLoading()
-            mAdapter.setItems(it)
+            if (it.isEmpty()) {
+                viewBinding.stateView.showEmpty()
+            } else {
+                viewBinding.stateView.showContent()
+                mAdapter.setItems(it)
+            }
         }
 
         viewModel.mUpdateInstalledLiveData.observe(this) { result ->
-            if (result == null) {
-                return@observe
-            }
+            if (result == null) return@observe
+            hideLoading()
 
             val items = mAdapter.getItems()
             for (index in items.indices) {
                 val bean = items[index]
                 if (bean.userID == result.userID) {
-                    if (result.success) {
-                        bean.isInstalledGms = !bean.isInstalledGms
-                    }
-                    mAdapter.replaceAt( index,bean)
+                    if (result.success) bean.isInstalledGms = !bean.isInstalledGms
+                    mAdapter.replaceAt(index, bean)
                     break
                 }
             }
-
-            hideLoading()
 
             if (result.success) {
                 toast(result.msg)
             } else {
                 MaterialDialog(this).show {
                     title(R.string.gms_manager)
-                    message(text = result.msg)
+                    message(text = result.msg ?: getString(R.string.uninstall_fail))
                     positiveButton(R.string.done)
                 }
             }
@@ -80,49 +84,43 @@ class GmsManagerActivity : LoadingActivity() {
         mAdapter = RVAdapter<GmsBean>(this, GmsAdapter()).bind(viewBinding.recyclerView)
             .setItemClickListener { view, item, _ ->
                 val checkbox = view.findViewById<SwitchMaterial>(R.id.checkbox)
-                if (item.isInstalledGms) {
-                    uninstallGms(item.userID, checkbox)
-                } else {
-                    installGms(item.userID, checkbox)
-                }
+                if (item.isInstalledGms) uninstallGms(item.userID, checkbox)
+                else installGms(item.userID, checkbox)
             }
         viewBinding.recyclerView.layoutManager = LinearLayoutManager(this)
-
     }
 
-    private fun installGms(userID: Int, checkbox: SwitchMaterial){
+    private fun installGms(userID: Int, checkbox: SwitchMaterial) {
         MaterialDialog(this).show {
             title(R.string.enable_gms)
             message(R.string.enable_gms_hint)
-            positiveButton(R.string.done){
+            positiveButton(R.string.done) {
                 showLoading()
                 viewModel.installGms(userID)
             }
-            negativeButton(R.string.cancel){
-                checkbox.isChecked = !checkbox.isChecked
+            negativeButton(R.string.cancel) {
+                checkbox.isChecked = false
             }
         }
     }
 
-    private fun uninstallGms(userID: Int, checkbox: SwitchMaterial){
+    private fun uninstallGms(userID: Int, checkbox: SwitchMaterial) {
         MaterialDialog(this).show {
             title(R.string.disable_gms)
             message(R.string.disable_gms_hint)
-            positiveButton(R.string.done){
+            positiveButton(R.string.done) {
                 showLoading()
                 viewModel.uninstallGms(userID)
             }
-            negativeButton(R.string.cancel){
-                checkbox.isChecked = !checkbox.isChecked
+            negativeButton(R.string.cancel) {
+                checkbox.isChecked = true
             }
         }
     }
 
-
-    companion object{
-        fun start(context: Context){
-            val intent = Intent(context,GmsManagerActivity::class.java)
-            context.startActivity(intent)
+    companion object {
+        fun start(context: Context) {
+            context.startActivity(Intent(context, GmsManagerActivity::class.java))
         }
     }
 }
