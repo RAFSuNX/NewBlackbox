@@ -522,8 +522,9 @@ class AppsFragment : Fragment() {
 
     private fun showAppInfo(info: AppInfo) {
         try {
-            val pm = BlackBoxCore.get().getPackageManager()
-            val pi = runCatching { pm.getPackageInfo(info.packageName, 0, userID) }.getOrNull()
+            val pi = runCatching {
+                BlackBoxCore.getBPackageManager().getPackageInfo(info.packageName, 0, userID)
+            }.getOrNull()
             val versionLine = if (pi != null)
                 getString(R.string.app_info_version, pi.versionName ?: "?", pi.versionCode)
             else ""
