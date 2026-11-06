@@ -8,7 +8,7 @@ import android.os.Parcel;
 import android.system.Os;
 import android.text.TextUtils;
 
-import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -17,6 +17,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -28,13 +29,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class FileUtils {
 
+    private static final int BUFFER_SIZE = 8192;
+
     public static int count(File file) {
-        if (!file.exists()) {
-            return -1;
-        }
-        if (file.isFile()) {
-            return 1;
-        }
+        if (!file.exists()) return -1;
+        if (file.isFile()) return 1;
         if (file.isDirectory()) {
             String[] fs = file.list();
             return fs == null ? 0 : fs.length;
@@ -44,21 +43,16 @@ public class FileUtils {
 
     public static String getFilenameExt(String filename) {
         int dotPos = filename.lastIndexOf('.');
-        if (dotPos == -1) {
-            return "";
-        }
-        return filename.substring(dotPos + 1);
+        return dotPos == -1 ? "" : filename.substring(dotPos + 1);
     }
 
     public static File changeExt(File f, String targetExt) {
         String outPath = f.getAbsolutePath();
         if (!getFilenameExt(outPath).equals(targetExt)) {
             int dotPos = outPath.lastIndexOf(".");
-            if (dotPos > 0) {
-                outPath = outPath.substring(0, dotPos + 1) + targetExt;
-            } else {
-                outPath = outPath + "." + targetExt;
-            }
+            outPath = dotPos > 0
+                    ? outPath.substring(0, dotPos + 1) + targetExt
+                    : outPath + "." + targetExt;
             return new File(outPath);
         }
         return f;
@@ -69,13 +63,14 @@ public class FileUtils {
     }
 
     public static String readToString(String fileName) throws IOException {
-        InputStream is = new FileInputStream(fileName);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        int i;
-        while ((i = is.read()) != -1) {
-            baos.write(i);
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(fileName)))) {
+            StringBuilder sb = new StringBuilder();
+            char[] buf = new char[BUFFER_SIZE];
+            int len;
+            while ((len = reader.read(buf)) != -1) sb.append(buf, 0, len);
+            return sb.toString();
         }
-        return baos.toString();
     }
 
     public static Parcel readToParcel(File file) throws IOException {
@@ -86,24 +81,17 @@ public class FileUtils {
         return in;
     }
 
-    
     public static void chmod(String path, int mode) throws Exception {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             try {
                 Os.chmod(path, mode);
                 return;
-            } catch (Exception e) {
-                
+            } catch (Exception ignored) {
             }
         }
-
         File file = new File(path);
-        String cmd = "chmod ";
-        if (file.isDirectory()) {
-            cmd += " -R ";
-        }
-        String cmode = String.format("%o", mode);
-        Runtime.getRuntime().exec(cmd + cmode + " " + path).waitFor();
+        String cmd = "chmod " + (file.isDirectory() ? "-R " : "");
+        Runtime.getRuntime().exec(cmd + String.format("%o", mode) + " " + path).waitFor();
     }
 
     public static void createSymlink(String oldPath, String newPath) throws Exception {
@@ -111,16 +99,14 @@ public class FileUtils {
             try {
                 Os.link(oldPath, newPath);
                 return;
-            } catch (Throwable e) {
-                
+            } catch (Throwable ignored) {
             }
         }
         Runtime.getRuntime().exec("ln -s " + oldPath + " " + newPath).waitFor();
     }
 
     public static boolean isSymlink(File file) throws IOException {
-        if (file == null)
-            throw new NullPointerException("File must not be null");
+        if (file == null) throw new NullPointerException("File must not be null");
         File canon;
         if (file.getParent() == null) {
             canon = file;
@@ -132,9 +118,9 @@ public class FileUtils {
     }
 
     public static void writeParcelToFile(Parcel p, File file) throws IOException {
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.write(p.marshall());
-        fos.close();
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(p.marshall());
+        }
     }
 
     public static void writeParcelToOutput(Parcel p, FileOutputStream fos) throws IOException {
@@ -142,43 +128,32 @@ public class FileUtils {
     }
 
     public static byte[] toByteArray(File file) throws IOException {
-        FileInputStream fileInputStream = new FileInputStream(file);
-        try {
-            return toByteArray(fileInputStream);
-        } finally {
-            closeQuietly(fileInputStream);
+        try (FileInputStream fis = new FileInputStream(file)) {
+            return toByteArray(fis);
         }
     }
 
     public static byte[] toByteArray(InputStream inStream) throws IOException {
-        ByteArrayOutputStream swapStream = new ByteArrayOutputStream();
-        byte[] buff = new byte[100];
-        int rc;
-        while ((rc = inStream.read(buff, 0, 100)) > 0) {
-            swapStream.write(buff, 0, rc);
-        }
-        return swapStream.toByteArray();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[BUFFER_SIZE];
+        int len;
+        while ((len = inStream.read(buf)) != -1) out.write(buf, 0, len);
+        return out.toByteArray();
     }
 
     public static int deleteDir(File dir) {
         int count = 0;
         if (dir.isDirectory()) {
             boolean link = false;
-            try {
-                link = isSymlink(dir);
-            } catch (Exception e) {
-                
-            }
+            try { link = isSymlink(dir); } catch (Exception ignored) {}
             if (!link) {
                 String[] children = dir.list();
-                for (String file : children) {
-                    count += deleteDir(new File(dir, file));
+                if (children != null) {
+                    for (String file : children) count += deleteDir(new File(dir, file));
                 }
             }
         }
-        if (dir.delete()) {
-            count++;
-        }
+        if (dir.delete()) count++;
         return count;
     }
 
@@ -187,141 +162,78 @@ public class FileUtils {
     }
 
     public static void writeToFile(InputStream dataIns, File target) throws IOException {
-        final int BUFFER = 1024;
-        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(target));
-        int count;
-        byte data[] = new byte[BUFFER];
-        while ((count = dataIns.read(data, 0, BUFFER)) != -1) {
-            bos.write(data, 0, count);
+        try (FileOutputStream fos = new FileOutputStream(target)) {
+            byte[] buf = new byte[BUFFER_SIZE];
+            int len;
+            while ((len = dataIns.read(buf)) != -1) fos.write(buf, 0, len);
         }
-        bos.close();
     }
 
     public static void writeToFile(byte[] data, File target) throws IOException {
-        FileOutputStream fo = null;
-        ReadableByteChannel src = null;
-        FileChannel out = null;
-        try {
-            src = Channels.newChannel(new ByteArrayInputStream(data));
-            fo = new FileOutputStream(target);
-            out = fo.getChannel();
+        try (FileOutputStream fos = new FileOutputStream(target);
+             ReadableByteChannel src = Channels.newChannel(new ByteArrayInputStream(data));
+             FileChannel out = fos.getChannel()) {
             out.transferFrom(src, 0, data.length);
-        } finally {
-            if (fo != null) {
-                fo.close();
-            }
-            if (src != null) {
-                src.close();
-            }
-            if (out != null) {
-                out.close();
-            }
         }
     }
 
     public static void copyFile(InputStream inputStream, File target) {
-        FileOutputStream outputStream = null;
-        try {
-            outputStream = new FileOutputStream(target);
-            byte[] data = new byte[4096];
+        try (FileOutputStream outputStream = new FileOutputStream(target)) {
+            byte[] buf = new byte[BUFFER_SIZE];
             int len;
-            while ((len = inputStream.read(data)) != -1) {
-                outputStream.write(data, 0, len);
-            }
-            outputStream.flush();
-        } catch (Throwable e) {
-            
+            while ((len = inputStream.read(buf)) != -1) outputStream.write(buf, 0, len);
+        } catch (Throwable ignored) {
         } finally {
             closeQuietly(inputStream);
-            closeQuietly(outputStream);
         }
     }
 
     public static void copyFile(File source, File target) throws IOException {
-        FileInputStream inputStream = null;
-        FileOutputStream outputStream = null;
-        try {
-            inputStream = new FileInputStream(source);
-            outputStream = new FileOutputStream(target);
-            FileChannel iChannel = inputStream.getChannel();
-            FileChannel oChannel = outputStream.getChannel();
-
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
-            while (true) {
-                buffer.clear();
-                int r = iChannel.read(buffer);
-                if (r == -1)
-                    break;
-                buffer.limit(buffer.position());
-                buffer.position(0);
-                oChannel.write(buffer);
-            }
-        } finally {
-            closeQuietly(inputStream);
-            closeQuietly(outputStream);
+        try (FileInputStream in = new FileInputStream(source);
+             FileOutputStream out = new FileOutputStream(target)) {
+            in.getChannel().transferTo(0, source.length(), out.getChannel());
         }
     }
 
     public static void closeQuietly(Closeable closeable) {
         if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (Exception ignored) {
-            }
+            try { closeable.close(); } catch (Exception ignored) {}
         }
     }
 
     public static int peekInt(byte[] bytes, int value, ByteOrder endian) {
-        int v2;
-        int v0;
+        int v0, v2;
         if (endian == ByteOrder.BIG_ENDIAN) {
-            v0 = value + 1;
-            v2 = v0 + 1;
-            v0 = (bytes[v0] & 255) << 16 | (bytes[value] & 255) << 24 | (bytes[v2] & 255) << 8 | bytes[v2 + 1] & 255;
+            v0 = value + 1; v2 = v0 + 1;
+            return (bytes[value] & 255) << 24 | (bytes[v0] & 255) << 16
+                    | (bytes[v2] & 255) << 8 | bytes[v2 + 1] & 255;
         } else {
-            v0 = value + 1;
-            v2 = v0 + 1;
-            v0 = (bytes[v0] & 255) << 8 | bytes[value] & 255 | (bytes[v2] & 255) << 16 | (bytes[v2 + 1] & 255) << 24;
+            v0 = value + 1; v2 = v0 + 1;
+            return bytes[value] & 255 | (bytes[v0] & 255) << 8
+                    | (bytes[v2] & 255) << 16 | (bytes[v2 + 1] & 255) << 24;
         }
-
-        return v0;
     }
 
     private static boolean isValidExtFilenameChar(char c) {
-        switch (c) {
-            case '\0':
-            case '/':
-                return false;
-            default:
-                return true;
-        }
+        return c != '\0' && c != '/';
     }
 
-    
     public static boolean isValidExtFilename(String name) {
-        return (name != null) && name.equals(buildValidExtFilename(name));
+        return name != null && name.equals(buildValidExtFilename(name));
     }
 
-    
     public static String buildValidExtFilename(String name) {
-        if (TextUtils.isEmpty(name) || ".".equals(name) || "..".equals(name)) {
-            return "(invalid)";
-        }
+        if (TextUtils.isEmpty(name) || ".".equals(name) || "..".equals(name)) return "(invalid)";
         final StringBuilder res = new StringBuilder(name.length());
         for (int i = 0; i < name.length(); i++) {
-            final char c = name.charAt(i);
-            if (isValidExtFilenameChar(c)) {
-                res.append(c);
-            } else {
-                res.append('_');
-            }
+            char c = name.charAt(i);
+            res.append(isValidExtFilenameChar(c) ? c : '_');
         }
         return res.toString();
     }
 
     public static void mkdirs(File path) {
-        if (!path.exists())
-            path.mkdirs();
+        if (!path.exists()) path.mkdirs();
     }
 
     public static void mkdirs(String path) {
@@ -351,115 +263,77 @@ public class FileUtils {
         int MODE_IXOTH = 00001;
 
         int MODE_755 = MODE_IRUSR | MODE_IWUSR | MODE_IXUSR
-                | MODE_IRGRP | MODE_IXGRP
-                | MODE_IROTH | MODE_IXOTH;
+                | MODE_IRGRP | MODE_IXGRP | MODE_IROTH | MODE_IXOTH;
     }
 
-    
     public static class FileLock {
-        private static FileLock singleton;
-        private Map<String, FileLockCount> mRefCountMap = new ConcurrentHashMap<String, FileLockCount>();
+        private static volatile FileLock singleton;
+        private final Map<String, FileLockCount> mRefCountMap = new ConcurrentHashMap<>();
 
         public static FileLock getInstance() {
             if (singleton == null) {
-                singleton = new FileLock();
+                synchronized (FileLock.class) {
+                    if (singleton == null) singleton = new FileLock();
+                }
             }
             return singleton;
         }
 
-        private int RefCntInc(String filePath, java.nio.channels.FileLock fileLock, RandomAccessFile randomAccessFile,
-                              FileChannel fileChannel) {
-            int refCount;
-            if (this.mRefCountMap.containsKey(filePath)) {
-                FileLockCount fileLockCount = this.mRefCountMap.get(filePath);
-                int i = fileLockCount.mRefCount;
-                fileLockCount.mRefCount = i + 1;
-                refCount = i;
-            } else {
-                refCount = 1;
-                this.mRefCountMap.put(filePath, new FileLockCount(fileLock, refCount, randomAccessFile, fileChannel));
-
+        private synchronized int RefCntInc(String filePath, java.nio.channels.FileLock fileLock,
+                RandomAccessFile randomAccessFile, FileChannel fileChannel) {
+            if (mRefCountMap.containsKey(filePath)) {
+                FileLockCount c = mRefCountMap.get(filePath);
+                return c.mRefCount++;
             }
-            return refCount;
+            mRefCountMap.put(filePath, new FileLockCount(fileLock, 1, randomAccessFile, fileChannel));
+            return 1;
         }
 
-        private int RefCntDec(String filePath) {
-            int refCount = 0;
-            if (this.mRefCountMap.containsKey(filePath)) {
-                FileLockCount fileLockCount = this.mRefCountMap.get(filePath);
-                int i = fileLockCount.mRefCount - 1;
-                fileLockCount.mRefCount = i;
-                refCount = i;
-                if (refCount <= 0) {
-                    this.mRefCountMap.remove(filePath);
-                }
-            }
-            return refCount;
+        private synchronized int RefCntDec(String filePath) {
+            FileLockCount c = mRefCountMap.get(filePath);
+            if (c == null) return 0;
+            if (--c.mRefCount <= 0) mRefCountMap.remove(filePath);
+            return c.mRefCount;
         }
 
         public boolean LockExclusive(File targetFile) {
-
-            if (targetFile == null) {
-                return false;
-            }
+            if (targetFile == null) return false;
             try {
-                File lockFile = new File(targetFile.getParentFile().getAbsolutePath().concat("/lock"));
-                if (!lockFile.exists()) {
-                    lockFile.createNewFile();
-                }
-                RandomAccessFile randomAccessFile = new RandomAccessFile(lockFile.getAbsolutePath(), "rw");
-                FileChannel channel = randomAccessFile.getChannel();
+                File lockFile = new File(targetFile.getParent(), "lock");
+                if (!lockFile.exists()) lockFile.createNewFile();
+                RandomAccessFile raf = new RandomAccessFile(lockFile, "rw");
+                FileChannel channel = raf.getChannel();
                 java.nio.channels.FileLock lock = channel.lock();
-                if (!lock.isValid()) {
-                    return false;
-                }
-                RefCntInc(lockFile.getAbsolutePath(), lock, randomAccessFile, channel);
+                if (!lock.isValid()) { raf.close(); return false; }
+                RefCntInc(lockFile.getAbsolutePath(), lock, raf, channel);
                 return true;
             } catch (Exception e) {
                 return false;
             }
         }
 
-        
         public void unLock(File targetFile) {
-
-            File lockFile = new File(targetFile.getParentFile().getAbsolutePath().concat("/lock"));
-            if (!lockFile.exists()) {
-                return;
-            }
-            if (this.mRefCountMap.containsKey(lockFile.getAbsolutePath())) {
-                FileLockCount fileLockCount = this.mRefCountMap.get(lockFile.getAbsolutePath());
-                if (fileLockCount != null) {
-                    java.nio.channels.FileLock fileLock = fileLockCount.mFileLock;
-                    RandomAccessFile randomAccessFile = fileLockCount.fOs;
-                    FileChannel fileChannel = fileLockCount.fChannel;
-                    try {
-                        if (RefCntDec(lockFile.getAbsolutePath()) <= 0) {
-                            if (fileLock != null && fileLock.isValid()) {
-                                fileLock.release();
-                            }
-                            if (randomAccessFile != null) {
-                                randomAccessFile.close();
-                            }
-                            if (fileChannel != null) {
-                                fileChannel.close();
-                            }
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+            File lockFile = new File(targetFile.getParent(), "lock");
+            if (!lockFile.exists()) return;
+            FileLockCount c = mRefCountMap.get(lockFile.getAbsolutePath());
+            if (c == null) return;
+            try {
+                if (RefCntDec(lockFile.getAbsolutePath()) <= 0) {
+                    if (c.mFileLock != null && c.mFileLock.isValid()) c.mFileLock.release();
+                    closeQuietly(c.fOs);
+                    closeQuietly(c.fChannel);
                 }
-            }
+            } catch (IOException ignored) {}
         }
 
-        private class FileLockCount {
+        private static class FileLockCount {
             FileChannel fChannel;
             RandomAccessFile fOs;
             java.nio.channels.FileLock mFileLock;
             int mRefCount;
 
-            FileLockCount(java.nio.channels.FileLock fileLock, int mRefCount, RandomAccessFile fOs,
-                          FileChannel fChannel) {
+            FileLockCount(java.nio.channels.FileLock fileLock, int mRefCount,
+                    RandomAccessFile fOs, FileChannel fChannel) {
                 this.mFileLock = fileLock;
                 this.mRefCount = mRefCount;
                 this.fOs = fOs;
@@ -469,18 +343,12 @@ public class FileUtils {
     }
 
     private static String getDataColumn(Context context, Uri uri, String selection, String[] selectionArgs) {
-        Cursor cursor = null;
-        final String column = "_data";
-        final String[] projection = {column};
-        try {
-            cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs, null);
+        final String[] projection = {"_data"};
+        try (Cursor cursor = context.getContentResolver()
+                .query(uri, projection, selection, selectionArgs, null)) {
             if (cursor != null && cursor.moveToFirst()) {
-                final int column_index = cursor.getColumnIndexOrThrow(column);
-                return cursor.getString(column_index);
+                return cursor.getString(cursor.getColumnIndexOrThrow("_data"));
             }
-        } finally {
-            if (cursor != null)
-                cursor.close();
         }
         return null;
     }
@@ -496,5 +364,4 @@ public class FileUtils {
     private static boolean isMediaDocument(Uri uri) {
         return "com.android.providers.media.documents".equals(uri.getAuthority());
     }
-
 }
