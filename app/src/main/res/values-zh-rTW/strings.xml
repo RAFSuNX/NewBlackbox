@@ -72,6 +72,13 @@
     <string name="send_logs_summary">上傳除錯日誌以協助診斷問題</string>
     <string name="send_logs_sending">正在傳送日誌…</string>
     <string name="version_info">版本</string>
+    <string name="storage_permission_title">需要儲存空間權限</string>
+    <string name="storage_permission_message">BlackBox需要「所有檔案存取」權限才能執行沙盒應用程式。若無此權限，部分應用程式可能無法正常運行。\n\n請在下一個畫面中授予權限。</string>
+    <string name="grant_permission">授予權限</string>
+    <string name="later">稍後</string>
+    <string name="error_title">錯誤</string>
+    <string name="ok">確定</string>
+    <string name="user_label">使用者 %d</string>
     <string name="use_vpn_network">使用VPN網路</string>
     <string name="use_vpn_network_summary">透過VPN路由沙盒應用程式的流量（可改善網路存取）</string>
     <string name="disable_flag_secure">停用Flag Secure</string>
