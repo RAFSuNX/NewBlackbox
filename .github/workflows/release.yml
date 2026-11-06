@@ -96,6 +96,7 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.version_name, '-') }}
 
       - name: Send signed APKs to Telegram
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VER="${{ steps.version.outputs.version_name }}"
