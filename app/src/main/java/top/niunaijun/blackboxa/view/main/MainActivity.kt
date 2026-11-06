@@ -356,16 +356,19 @@ class MainActivity : LoadingActivity() {
 
     private fun updateUserRemark(userId: Int) {
         try {
-            var remark =
-                    AppManager.mRemarkSharedPreferences.getString("Remark$userId", "User $userId")
-            if (remark.isNullOrEmpty()) {
-                remark = "User $userId"
+            val userExists = BlackBoxCore.get().users.any { it.id == userId }
+            if (!userExists) {
+                // Placeholder slide for a not-yet-created clone environment
+                viewBinding.toolbarLayout.toolbar.subtitle = getString(R.string.new_clone_label)
+                return
             }
-
+            var remark = AppManager.mRemarkSharedPreferences.getString(
+                    "Remark$userId", getString(R.string.user_label, userId))
+            if (remark.isNullOrEmpty()) remark = getString(R.string.user_label, userId)
             viewBinding.toolbarLayout.toolbar.subtitle = remark
         } catch (e: Exception) {
             Log.e(TAG, "Error updating user remark: ${e.message}")
-            viewBinding.toolbarLayout.toolbar.subtitle = "User $userId"
+            viewBinding.toolbarLayout.toolbar.subtitle = getString(R.string.user_label, userId)
         }
     }
 
