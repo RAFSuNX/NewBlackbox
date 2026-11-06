@@ -1630,12 +1630,12 @@ public class BlackBoxCore extends ClientConfiguration {
     
     
     public static void installSystemHooks() {
-        try {
-            SimpleCrashFix.installSimpleFix();
-            Slog.d(TAG, "System hooks installed successfully");
-        } catch (Exception e) {
-            Slog.e(TAG, "Failed to install system hooks", e);
-        }
+        // All crash fixes already installed in static initializer (idempotent if called again)
+        SimpleCrashFix.installSimpleFix();
+        SocialMediaAppCrashPrevention.initialize();
+        DexCrashPrevention.initialize();
+        NativeCrashPrevention.initialize();
+        CrashMonitor.initialize();
     }
     
     
