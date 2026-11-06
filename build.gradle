@@ -11,8 +11,8 @@ ext {
 
     minSdk = 21
     // CI overrides these via -PversionCode and -PversionName Gradle properties
-    versionCode = project.findProperty('versionCode')?.toInteger() ?: 400
-    versionName = project.findProperty('versionName') ?: "4.0.0"
+    versionCode = project.findProperty('versionCode')?.toInteger() ?: 410
+    versionName = project.findProperty('versionName') ?: "4.1.0"
     xVersion = '1.1.0'
     hiddenApiBypass = '4.3'
 }

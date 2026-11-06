@@ -63,4 +63,18 @@
     <string name="disable_gms">关闭服务</string>
     <string name="disable_gms_hint">是否清除当前Google服务环境？Google服务数据将被清空。</string>
     <string name="no_gms">当前手机没有Google服务环境。</string>
+    <string name="unknown_app">未知应用</string>
+    <string name="add_app">安装应用</string>
+    <string name="error_load">加载失败，点击重试</string>
+    <string name="app_icon_desc">%s 的图标</string>
+    <string name="hide_root_summary">防止沙盒内的应用检测到设备已Root</string>
+    <string name="daemon_enable_summary">BlackBox进入后台时保持虚拟应用运行</string>
+    <string name="send_logs">发送日志</string>
+    <string name="send_logs_summary">上传调试日志以帮助诊断问题</string>
+    <string name="send_logs_sending">正在发送日志…</string>
+    <string name="version_info">版本</string>
+    <string name="use_vpn_network">使用VPN网络</string>
+    <string name="use_vpn_network_summary">通过VPN路由沙盒应用的流量（可改善网络访问）</string>
+    <string name="disable_flag_secure">禁用Flag Secure</string>
+    <string name="disable_flag_secure_summary">允许在应用内截图和录屏</string>
 </resources>
