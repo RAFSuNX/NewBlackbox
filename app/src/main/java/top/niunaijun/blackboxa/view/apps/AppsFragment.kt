@@ -359,6 +359,10 @@ class AppsFragment : Fragment() {
                                     R.id.app_shortcut -> {
                                         ShortcutUtil.createShortcut(requireContext(), userID, data)
                                     }
+
+                                    R.id.app_info -> {
+                                        showAppInfo(data)
+                                    }
                                 }
                                 return@setOnMenuItemClickListener true
                             } catch (e: Exception) {
@@ -379,6 +383,12 @@ class AppsFragment : Fragment() {
     
     private fun initData() {
         try {
+            val isNewClone = BlackBoxCore.get().users.none { it.id == userID }
+            if (isNewClone) {
+                viewBinding.stateView.showEmpty()
+                // Show clone hint in empty view if StateView supports custom text
+                return
+            }
             viewBinding.stateView.showLoading()
             viewModel.getInstalledApps(userID)
             viewModel.appsLiveData.observe(viewLifecycleOwner) {
@@ -507,6 +517,28 @@ class AppsFragment : Fragment() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error showing clear dialog: ${e.message}")
+        }
+    }
+
+    private fun showAppInfo(info: AppInfo) {
+        try {
+            val pm = BlackBoxCore.get().getPackageManager()
+            val pi = runCatching { pm.getPackageInfo(info.packageName, 0, userID) }.getOrNull()
+            val versionLine = if (pi != null)
+                getString(R.string.app_info_version, pi.versionName ?: "?", pi.versionCode)
+            else ""
+            val msg = buildString {
+                if (versionLine.isNotEmpty()) appendLine(versionLine)
+                appendLine(getString(R.string.app_info_package, info.packageName))
+                append(getString(R.string.app_info_user, userID))
+            }
+            MaterialDialog(requireContext()).show {
+                title(text = info.name)
+                message(text = msg)
+                positiveButton(R.string.ok)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing app info: ${e.message}")
         }
     }
 

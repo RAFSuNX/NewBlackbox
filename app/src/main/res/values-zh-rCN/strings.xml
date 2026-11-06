@@ -80,6 +80,12 @@
     <string name="error_title">错误</string>
     <string name="ok">确定</string>
     <string name="user_label">用户 %d</string>
+    <string name="app_info">应用信息</string>
+    <string name="new_clone_label">新克隆</string>
+    <string name="new_clone_hint">这是一个空的隔离环境。\n在此安装应用以将其激活为独立克隆。</string>
+    <string name="app_info_version">版本：%s (%d)</string>
+    <string name="app_info_package">包名：%s</string>
+    <string name="app_info_user">用户：%d</string>
     <string name="use_vpn_network">使用VPN网络</string>
     <string name="use_vpn_network_summary">通过VPN路由沙盒应用的流量（可改善网络访问）</string>
     <string name="disable_flag_secure">禁用Flag Secure</string>

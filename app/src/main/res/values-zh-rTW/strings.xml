@@ -79,6 +79,12 @@
     <string name="error_title">錯誤</string>
     <string name="ok">確定</string>
     <string name="user_label">使用者 %d</string>
+    <string name="app_info">應用程式資訊</string>
+    <string name="new_clone_label">新複製環境</string>
+    <string name="new_clone_hint">這是一個空的隔離環境。\n在此安裝應用程式以將其激活為獨立的複製環境。</string>
+    <string name="app_info_version">版本：%s (%d)</string>
+    <string name="app_info_package">套件名稱：%s</string>
+    <string name="app_info_user">使用者：%d</string>
     <string name="use_vpn_network">使用VPN網路</string>
     <string name="use_vpn_network_summary">透過VPN路由沙盒應用程式的流量（可改善網路存取）</string>
     <string name="disable_flag_secure">停用Flag Secure</string>

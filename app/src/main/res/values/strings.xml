@@ -84,4 +84,10 @@
     <string name="error_title">Error</string>
     <string name="ok">OK</string>
     <string name="user_label">User %d</string>
+    <string name="app_info">App Info</string>
+    <string name="new_clone_label">New Clone</string>
+    <string name="new_clone_hint">This is an empty isolated environment.\nInstall an app here to activate it as a separate clone.</string>
+    <string name="app_info_version">Version: %s (%d)</string>
+    <string name="app_info_package">Package: %s</string>
+    <string name="app_info_user">User: %d</string>
 </resources>
