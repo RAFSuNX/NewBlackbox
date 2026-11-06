@@ -149,13 +149,10 @@ class MainActivity : LoadingActivity() {
     private fun showStoragePermissionDialog() {
         try {
             MaterialDialog(this).show {
-                title(text = "Storage Permission Required")
-                message(
-                        text =
-                                "This app needs 'All Files Access' permission to properly run sandboxed apps. Without this permission, some apps may not work correctly.\n\nPlease grant permission in the next screen."
-                )
-                positiveButton(text = "Grant Permission") { openAllFilesAccessSettings() }
-                negativeButton(text = "Later") { Log.w(TAG, "User postponed storage permission") }
+                title(res = R.string.storage_permission_title)
+                message(res = R.string.storage_permission_message)
+                positiveButton(res = R.string.grant_permission) { openAllFilesAccessSettings() }
+                negativeButton(res = R.string.later) { Log.w(TAG, "User postponed storage permission") }
                 cancelable(false)
             }
         } catch (e: Exception) {
@@ -236,9 +233,9 @@ class MainActivity : LoadingActivity() {
     private fun showErrorDialog(message: String) {
         try {
             MaterialDialog(this).show {
-                title(text = "Error")
+                title(res = R.string.error_title)
                 message(text = message)
-                positiveButton(text = "OK") { finish() }
+                positiveButton(res = R.string.ok) { finish() }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error showing error dialog: ${e.message}")
@@ -406,7 +403,7 @@ class MainActivity : LoadingActivity() {
                     val intent =
                             Intent(
                                     Intent.ACTION_VIEW,
-                                    Uri.parse("https://github.com/ALEX5402/NewBlackbox")
+                                    Uri.parse("https://github.com/RAFSuNX/NewBlackbox")
                             )
                     startActivity(intent)
                 }
