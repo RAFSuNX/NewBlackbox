@@ -39,54 +39,32 @@ jobs:
             :Bcore:assembleDebug :Bcore:assembleRelease \
             :black-reflection:assemble :compiler:assemble
 
-      - name: Send debug APKs to Telegram
+      - name: Send artifacts to Telegram
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%s)
+          send_file() {
+            local FILE="$1" CAPTION="$2"
+            [ -f "$FILE" ] || return 0
+            RESPONSE=$(curl -s -F document=@"$FILE" \
+              -F chat_id="$TELEGRAM_CHAT_ID" \
+              -F caption="$CAPTION" \
+              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
+            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
+            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
+          }
           for APK in ./app/build/outputs/apk/debug/*.apk; do
-            [ -f "$APK" ] || continue
-            RESPONSE=$(curl -s -F document=@"$APK" \
-              -F chat_id="$TELEGRAM_CHAT_ID" \
-              -F caption="[DEBUG] $(basename $APK) | $COMMIT_MSG" \
-              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
-            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
+            send_file "$APK" "[DEBUG] $(basename $APK) | $COMMIT_MSG"
           done
-
-      - name: Send release APKs to Telegram
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
           for APK in ./app/build/outputs/apk/release/*.apk; do
-            [ -f "$APK" ] || continue
-            RESPONSE=$(curl -s -F document=@"$APK" \
-              -F chat_id="$TELEGRAM_CHAT_ID" \
-              -F caption="[RELEASE SIGNED] $(basename $APK) | $COMMIT_MSG" \
-              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
-            MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
-            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
-              -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
+            send_file "$APK" "[RELEASE SIGNED] $(basename $APK) | $COMMIT_MSG"
           done
-
-      - name: Send Bcore AARs to Telegram
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
           for AAR in $(find ./Bcore/build/outputs/aar -name "*.aar" 2>/dev/null); do
-            [ -f "$AAR" ] || continue
-            curl -s -F document=@"$AAR" \
-              -F chat_id="$TELEGRAM_CHAT_ID" \
-              -F caption="[Bcore AAR] $(basename $AAR) | $COMMIT_MSG" \
-              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument > /dev/null
+            send_file "$AAR" "[Bcore AAR] $(basename $AAR) | $COMMIT_MSG"
           done
-
-      - name: Send black-reflection and compiler to Telegram
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
           for ART in \
             $(find ./black-reflection/build/libs ./black-reflection/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -1) \
             $(find ./compiler/build/libs ./compiler/build/outputs -name "*.jar" -o -name "*.aar" 2>/dev/null | head -1); do
-            [ -f "$ART" ] || continue
-            curl -s -F document=@"$ART" \
-              -F chat_id="$TELEGRAM_CHAT_ID" \
-              -F caption="[$(basename $(dirname $ART))] $(basename $ART) | $COMMIT_MSG" \
-              https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument > /dev/null
+            send_file "$ART" "[$(basename $(dirname $ART))] $(basename $ART) | $COMMIT_MSG"
           done
