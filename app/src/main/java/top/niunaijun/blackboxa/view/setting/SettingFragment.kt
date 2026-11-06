@@ -92,7 +92,7 @@ class SettingFragment : PreferenceFragmentCompat() {
             it.isEnabled = false
             BlackBoxCore.get()
                     .sendLogs(
-                            "Manual Log Upload from Settings",
+                            getString(R.string.send_logs),
                             true,
                             object : BlackBoxCore.LogSendListener {
                                 override fun onSuccess() {
@@ -104,7 +104,7 @@ class SettingFragment : PreferenceFragmentCompat() {
                                 }
                             }
                     )
-            toast("Sending logs... (Check notifications for status)")
+            toast(R.string.send_logs_sending)
             true
         }
     }
