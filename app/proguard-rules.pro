@@ -1,35 +1,21 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Keep stack traces readable
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# BlackBox core — must not be obfuscated (reflection + native hooks depend on exact names)
+-keep class top.niunaijun.blackbox.** { *; }
+-keep class top.niunaijun.jnihook.** { *; }
+-keep class mirror.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Android framework classes referenced by hooks
+-keep class android.** { *; }
+-keep class com.android.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
-
--keep class top.niunaijun.blackbox.** {*; }
--keep class top.niunaijun.jnihook.** {*; }
--keep class mirror.** {*; }
--keep class android.** {*; }
--keep class com.android.** {*; }
-
--keep class top.niunaijun.blackreflection.** {*; }
--keep @top.niunaijun.blackreflection.annotation.BClass class * {*;}
--keep @top.niunaijun.blackreflection.annotation.BClassName class * {*;}
--keep @top.niunaijun.blackreflection.annotation.BClassNameNotProcess class * {*;}
+# black-reflection annotation processor
+-keep class top.niunaijun.blackreflection.** { *; }
+-keep @top.niunaijun.blackreflection.annotation.BClass class * { *; }
+-keep @top.niunaijun.blackreflection.annotation.BClassName class * { *; }
+-keep @top.niunaijun.blackreflection.annotation.BClassNameNotProcess class * { *; }
 -keepclasseswithmembernames class * {
     @top.niunaijun.blackreflection.annotation.BField.* <methods>;
     @top.niunaijun.blackreflection.annotation.BFieldNotProcess.* <methods>;
@@ -42,3 +28,12 @@
     @top.niunaijun.blackreflection.annotation.BConstructor.* <methods>;
     @top.niunaijun.blackreflection.annotation.BConstructorNotProcess.* <methods>;
 }
+
+# App UI — only keep what's needed for ViewBinding and serialization
+-keep class top.niunaijun.blackboxa.bean.** { *; }
+
+# Suppress noisy warnings from third-party libs
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
