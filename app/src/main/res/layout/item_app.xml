@@ -5,7 +5,11 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingTop="16dp">
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless">
 
     <FrameLayout
             android:layout_width="wrap_content"
@@ -13,8 +17,9 @@
 
         <ImageView
                 android:id="@+id/icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp" />
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:contentDescription="@string/app_icon_desc" />
 
         <com.othershe.cornerlabelview.CornerLabelView
                 android:id="@+id/cornerLabel"
@@ -22,21 +27,23 @@
                 android:layout_height="24dp"
                 android:layout_gravity="top|start"
                 android:visibility="invisible"
-                app:bg_color="@color/primary"
+                app:bg_color="@color/accent"
                 app:position="left_top"
                 app:side_length="22dp"
                 app:text="XP"
-                app:text_color="@color/white"
+                app:text_color="@color/primary_dark"
                 app:text_size="8sp" />
     </FrameLayout>
 
     <TextView
             android:id="@+id/name"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"
             android:textColor="@color/primary_text"
             android:textSize="12sp" />
-
 
 </LinearLayout>

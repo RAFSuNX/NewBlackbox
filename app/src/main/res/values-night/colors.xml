@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand (stays same in dark) -->
+    <color name="primary">#1E1E1E</color>
+    <color name="primary_dark">#121212</color>
+    <color name="primary_light">#2C2C2C</color>
+    <color name="accent">#90CAF9</color>
+
+    <!-- Text -->
+    <color name="primary_text">#EFEFEF</color>
+    <color name="secondary_text">#9E9E9E</color>
+
+    <!-- Surface -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="surface">#1E1E1E</color>
+    <color name="background">#121212</color>
+    <color name="on_surface">#EFEFEF</color>
+    <color name="divider">#2C2C2C</color>
+    <color name="icon_placeholder">#444444</color>
+</resources>
