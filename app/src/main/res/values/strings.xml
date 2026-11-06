@@ -67,4 +67,8 @@
     <string name="disable_gms">Disable Service</string>
     <string name="disable_gms_hint">Clear the current Google service environment? Google service data will be cleared.</string>
     <string name="no_gms">Currently, there is no Google service environment on mobile phones.</string>
+    <string name="unknown_app">Unknown App</string>
+    <string name="add_app">Install App</string>
+    <string name="error_load">Failed to load. Tap to retry.</string>
+    <string name="app_icon_desc">%s app icon</string>
 </resources>
