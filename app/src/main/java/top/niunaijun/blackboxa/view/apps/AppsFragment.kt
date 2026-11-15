@@ -24,7 +24,6 @@ import top.niunaijun.blackboxa.databinding.FragmentAppsBinding
 import top.niunaijun.blackboxa.util.InjectionUtil
 import top.niunaijun.blackboxa.util.ShortcutUtil
 import top.niunaijun.blackboxa.util.inflate
-import top.niunaijun.blackboxa.util.MemoryManager
 import top.niunaijun.blackboxa.util.toast
 import top.niunaijun.blackboxa.view.base.LoadingActivity
 import top.niunaijun.blackboxa.view.main.MainActivity
@@ -91,48 +90,6 @@ class AppsFragment : Fragment() {
             viewBinding.recyclerView.setHasFixedSize(true)
             
             
-            viewBinding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                    try {
-                        super.onScrollStateChanged(recyclerView, newState)
-                        when (newState) {
-                            RecyclerView.SCROLL_STATE_IDLE -> {
-                                
-                                MemoryManager.optimizeMemoryForRecyclerView()
-                            }
-                            RecyclerView.SCROLL_STATE_DRAGGING -> {
-                                
-                                
-                            }
-                            RecyclerView.SCROLL_STATE_SETTLING -> {
-                                
-                                
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in scroll state change: ${e.message}")
-                    }
-                }
-                
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                    try {
-                        super.onScrolled(recyclerView, dx, dy)
-                        
-                        if (Math.abs(dy) > 100) {
-                            
-                            
-                            
-                            if (MemoryManager.isMemoryCritical()) {
-                                Log.w(TAG, "Memory critical during fast scrolling, forcing GC")
-                                MemoryManager.forceGarbageCollectionIfNeeded()
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in scroll: ${e.message}")
-                    }
-                }
-            })
-
             val touchCallBack = AppsTouchCallBack { from, to ->
                 try {
                     onItemMove(from, to)
