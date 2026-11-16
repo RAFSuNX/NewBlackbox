@@ -44,7 +44,6 @@ class SettingFragment : PreferenceFragmentCompat() {
             disableFlagSecurePreference
         }
 
-        initSendLogs()
     }
 
     private fun initGms() {
@@ -86,26 +85,5 @@ class SettingFragment : PreferenceFragmentCompat() {
             return@setOnPreferenceChangeListener true
         }
     }
-    private fun initSendLogs() {
-        val sendLogsPreference: Preference? = findPreference("send_logs")
-        sendLogsPreference?.setOnPreferenceClickListener {
-            it.isEnabled = false
-            BlackBoxCore.get()
-                    .sendLogs(
-                            getString(R.string.send_logs),
-                            true,
-                            object : BlackBoxCore.LogSendListener {
-                                override fun onSuccess() {
-                                    activity?.runOnUiThread { sendLogsPreference.isEnabled = true }
-                                }
 
-                                override fun onFailure(error: String?) {
-                                    activity?.runOnUiThread { sendLogsPreference.isEnabled = true }
-                                }
-                            }
-                    )
-            toast(R.string.send_logs_sending)
-            true
-        }
-    }
 }
