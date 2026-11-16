@@ -1,7 +1,6 @@
 package top.niunaijun.blackbox.fake.service;
 
 import android.accounts.Account;
-import android.accounts.AccountManager;
 import android.accounts.IAccountManagerResponse;
 import android.content.Context;
 import android.os.Bundle;
@@ -272,8 +271,8 @@ public class IAccountManagerProxy extends BinderInvocationStub {
                     @Override
                     public void onResult(Bundle value) throws RemoteException {
                         if (value != null) {
-                            String name = value.getString(AccountManager.KEY_ACCOUNT_NAME);
-                            String type = value.getString(AccountManager.KEY_ACCOUNT_TYPE);
+                            String name = value.getString("authAccount");
+                            String type = value.getString("accountType");
                             if (name != null && type != null) {
                                 BAccountManager.get().addAccountExplicitly(
                                         new Account(name, type), null, null);
@@ -306,8 +305,8 @@ public class IAccountManagerProxy extends BinderInvocationStub {
                     @Override
                     public void onResult(Bundle value) throws RemoteException {
                         if (value != null) {
-                            String name = value.getString(AccountManager.KEY_ACCOUNT_NAME);
-                            String type = value.getString(AccountManager.KEY_ACCOUNT_TYPE);
+                            String name = value.getString("authAccount");
+                            String type = value.getString("accountType");
                             if (name != null && type != null) {
                                 BAccountManager.get().addAccountExplicitly(
                                         new Account(name, type), null, null);
