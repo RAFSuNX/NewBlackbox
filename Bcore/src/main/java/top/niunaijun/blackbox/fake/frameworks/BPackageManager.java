@@ -817,16 +817,9 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     private PackageInfo createFallbackPackageInfo(String packageName, int flags, int userId) {
-        // For GMS packages, prefer the real host system info so signatures are genuine
-        if ("com.android.vending".equals(packageName)
-                || "com.google.android.gms".equals(packageName)
-                || "com.google.android.gsf".equals(packageName)) {
-            try {
-                return BlackBoxCore.getContext().getPackageManager()
-                        .getPackageInfo(packageName, flags | android.content.pm.PackageManager.GET_SIGNATURES);
-            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
-            }
-        }
+        // Note: do NOT call getContext().getPackageManager() here — that PM is hooked
+        // by IPackageManagerProxy and would cause infinite recursion. GMS packages are
+        // handled upstream in the hook itself via method.invoke() (real IPackageManager).
         PackageInfo info = new PackageInfo();
         info.packageName = packageName;
         info.versionCode = 1;
