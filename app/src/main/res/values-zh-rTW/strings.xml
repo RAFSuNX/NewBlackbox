@@ -79,6 +79,13 @@
     <string name="error_title">錯誤</string>
     <string name="ok">確定</string>
     <string name="user_label">使用者 %d</string>
+    <string name="add_google_account">新增帳號</string>
+    <string name="change_google_account">更換</string>
+    <string name="google_account_added">Google帳號已新增：%s</string>
+    <string name="google_account_add_failed">新增Google帳號失敗</string>
+    <string name="google_account_hint">尚未新增Google帳號 — 點擊新增</string>
+    <string name="remove_google_account">移除</string>
+    <string name="google_account_removed">Google帳號已移除</string>
     <string name="app_info">應用程式資訊</string>
     <string name="new_clone_label">新複製環境</string>
     <string name="new_clone_hint">這是一個空的隔離環境。\n在此安裝應用程式以將其激活為獨立的複製環境。</string>

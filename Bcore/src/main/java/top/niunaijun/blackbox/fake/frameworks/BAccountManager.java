@@ -99,12 +99,27 @@ public class BAccountManager extends BlackManager<IBAccountManagerService> {
     }
 
     public boolean addAccountExplicitly(Account account, String password, Bundle extras) {
+        return addAccountExplicitlyForUser(account, password, extras, BActivityThread.getUserId());
+    }
+
+    /** Explicit userId variant — used by the app layer (non-sandboxed) to add accounts per slot. */
+    public boolean addAccountExplicitlyForUser(Account account, String password, Bundle extras, int userId) {
         try {
-            return getService().addAccountExplicitly(account, password, extras, BActivityThread.getUserId());
+            return getService().addAccountExplicitly(account, password, extras, userId);
         } catch (RemoteException e) {
             e.printStackTrace();
         }
         return false;
+    }
+
+    /** Returns accounts of the given type for a specific user slot. */
+    public Account[] getAccountsForUser(String type, int userId) {
+        try {
+            return getService().getAccountsAsUser(type, userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return new Account[0];
     }
 
     public void removeAccountAsUser(IAccountManagerResponse response, Account account,

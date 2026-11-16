@@ -80,6 +80,13 @@
     <string name="error_title">错误</string>
     <string name="ok">确定</string>
     <string name="user_label">用户 %d</string>
+    <string name="add_google_account">添加账号</string>
+    <string name="change_google_account">更换</string>
+    <string name="google_account_added">Google账号已添加：%s</string>
+    <string name="google_account_add_failed">添加Google账号失败</string>
+    <string name="google_account_hint">未添加Google账号 — 点击添加</string>
+    <string name="remove_google_account">移除</string>
+    <string name="google_account_removed">Google账号已移除</string>
     <string name="app_info">应用信息</string>
     <string name="new_clone_label">新克隆</string>
     <string name="new_clone_hint">这是一个空的隔离环境。\n在此安装应用以将其激活为独立克隆。</string>

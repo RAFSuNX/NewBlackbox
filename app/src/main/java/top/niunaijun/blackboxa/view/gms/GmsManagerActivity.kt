@@ -1,8 +1,11 @@
 package top.niunaijun.blackboxa.view.gms
 
+import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import cbfg.rvadapter.RVAdapter
@@ -22,6 +25,32 @@ class GmsManagerActivity : LoadingActivity() {
     private lateinit var viewModel: GmsViewModel
     private lateinit var mAdapter: RVAdapter<GmsBean>
     private val viewBinding: ActivityGmsBinding by inflate()
+
+    // Which user slot is waiting for an account to be added
+    private var pendingAccountUserId: Int = -1
+
+    // System account picker result
+    private val addAccountResult = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && pendingAccountUserId >= 0) {
+            val email = result.data
+                ?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
+                ?: return@registerForActivityResult
+
+            val addResult = MutableLiveData<Boolean>()
+            addResult.observe(this) { success ->
+                if (success) {
+                    toast(getString(R.string.google_account_added, email))
+                    viewModel.getInstalledUser() // refresh list
+                } else {
+                    toast(R.string.google_account_add_failed)
+                }
+                pendingAccountUserId = -1
+            }
+            viewModel.addGoogleAccount(email, pendingAccountUserId, addResult)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,13 +110,42 @@ class GmsManagerActivity : LoadingActivity() {
     }
 
     private fun initRecyclerView() {
-        mAdapter = RVAdapter<GmsBean>(this, GmsAdapter()).bind(viewBinding.recyclerView)
+        mAdapter = RVAdapter<GmsBean>(this, GmsAdapter { bean -> onAddAccountClick(bean) })
+            .bind(viewBinding.recyclerView)
             .setItemClickListener { view, item, _ ->
                 val checkbox = view.findViewById<SwitchMaterial>(R.id.checkbox)
                 if (item.isInstalledGms) uninstallGms(item.userID, checkbox)
                 else installGms(item.userID, checkbox)
             }
         viewBinding.recyclerView.layoutManager = LinearLayoutManager(this)
+    }
+
+    private fun onAddAccountClick(bean: GmsBean) {
+        if (bean.googleAccount != null) {
+            // Already has an account — offer to remove or change
+            MaterialDialog(this).show {
+                title(R.string.gms_manager)
+                message(text = bean.googleAccount)
+                positiveButton(R.string.change_google_account) { launchAccountPicker(bean.userID) }
+                negativeButton(R.string.remove_google_account) {
+                    viewModel.removeGoogleAccount(bean.googleAccount!!, bean.userID)
+                    toast(R.string.google_account_removed)
+                    viewModel.getInstalledUser()
+                }
+            }
+        } else {
+            launchAccountPicker(bean.userID)
+        }
+    }
+
+    private fun launchAccountPicker(userId: Int) {
+        pendingAccountUserId = userId
+        // Opens the real system Google account picker — user can pick existing or add new
+        val intent = AccountManager.newChooseAccountIntent(
+            null, null, arrayOf("com.google"),
+            null, null, null, null
+        )
+        addAccountResult.launch(intent)
     }
 
     private fun installGms(userID: Int, checkbox: SwitchMaterial) {
@@ -98,9 +156,7 @@ class GmsManagerActivity : LoadingActivity() {
                 showLoading()
                 viewModel.installGms(userID)
             }
-            negativeButton(R.string.cancel) {
-                checkbox.isChecked = false
-            }
+            negativeButton(R.string.cancel) { checkbox.isChecked = false }
         }
     }
 
@@ -112,9 +168,7 @@ class GmsManagerActivity : LoadingActivity() {
                 showLoading()
                 viewModel.uninstallGms(userID)
             }
-            negativeButton(R.string.cancel) {
-                checkbox.isChecked = true
-            }
+            negativeButton(R.string.cancel) { checkbox.isChecked = true }
         }
     }
 

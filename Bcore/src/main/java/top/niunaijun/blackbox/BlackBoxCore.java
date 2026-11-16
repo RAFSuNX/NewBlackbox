@@ -48,6 +48,7 @@ import top.niunaijun.blackbox.entity.pm.InstallOption;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
 
 import top.niunaijun.blackbox.fake.delegate.ContentProviderDelegate;
+import top.niunaijun.blackbox.fake.frameworks.BAccountManager;
 import top.niunaijun.blackbox.fake.frameworks.BActivityManager;
 import top.niunaijun.blackbox.fake.frameworks.BJobManager;
 import top.niunaijun.blackbox.fake.frameworks.BPackageManager;
@@ -1231,6 +1232,25 @@ public class BlackBoxCore extends ClientConfiguration {
     public boolean uninstallGms(int userId) {
         GmsCore.uninstallGApps(userId);
         return !GmsCore.isInstalledGoogleService(userId);
+    }
+
+    /** Add a Google account (by email) to a specific virtual user slot. */
+    public boolean addGoogleAccount(String email, int userId) {
+        if (email == null || email.isEmpty()) return false;
+        android.accounts.Account account = new android.accounts.Account(email, "com.google");
+        return getBPackageManager() != null &&
+               BAccountManager.get().addAccountExplicitlyForUser(account, null, null, userId);
+    }
+
+    /** Get Google accounts registered in a specific virtual user slot. */
+    public android.accounts.Account[] getGoogleAccounts(int userId) {
+        return BAccountManager.get().getAccountsForUser("com.google", userId);
+    }
+
+    /** Remove a Google account from a specific virtual user slot. */
+    public boolean removeGoogleAccount(String email, int userId) {
+        android.accounts.Account account = new android.accounts.Account(email, "com.google");
+        return BAccountManager.get().removeAccountExplicitly(account);
     }
 
     
