@@ -448,18 +448,9 @@ public class BActivityThread extends IBActivityThread.Stub {
                 
                 
                 if (application == null) {
-                    Slog.w(TAG, "Creating minimal application context as fallback");
-                    try {
-                        
-                        application = (Application) packageContext;
-                        if (application == null) {
-                            Slog.e(TAG, "Even package context is null, this is critical");
-                            throw new RuntimeException("Unable to create application context");
-                        }
-                    } catch (Exception contextException) {
-                        Slog.e(TAG, "Failed to create fallback application context", contextException);
-                        throw new RuntimeException("Unable to makeApplication - all fallback attempts failed", contextException);
-                    }
+                    // packageContext is ContextImpl, not Application — the cast
+                    // was always wrong and caused ClassCastException every time.
+                    throw new RuntimeException("Unable to makeApplication for " + packageName);
                 }
             }
             
