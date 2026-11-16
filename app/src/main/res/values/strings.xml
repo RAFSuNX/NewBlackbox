@@ -84,6 +84,13 @@
     <string name="error_title">Error</string>
     <string name="ok">OK</string>
     <string name="user_label">User %d</string>
+    <string name="add_google_account">Add Account</string>
+    <string name="change_google_account">Change</string>
+    <string name="google_account_added">Google account added: %s</string>
+    <string name="google_account_add_failed">Failed to add Google account</string>
+    <string name="google_account_hint">No Google account — tap to add</string>
+    <string name="remove_google_account">Remove</string>
+    <string name="google_account_removed">Google account removed</string>
     <string name="app_info">App Info</string>
     <string name="new_clone_label">New Clone</string>
     <string name="new_clone_hint">This is an empty isolated environment.\nInstall an app here to activate it as a separate clone.</string>

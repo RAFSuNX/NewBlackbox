@@ -27,7 +27,15 @@ class GmsViewModel(private val mRepo: GmsRepository) : BaseViewModel() {
 
     fun uninstallGms(userID: Int) {
         launchOnUI {
-            mRepo.uninstallGms(userID,mUpdateInstalledLiveData)
+            mRepo.uninstallGms(userID, mUpdateInstalledLiveData)
         }
+    }
+
+    fun addGoogleAccount(email: String, userID: Int, result: MutableLiveData<Boolean>) {
+        launchOnUI { result.postValue(mRepo.addGoogleAccount(email, userID)) }
+    }
+
+    fun removeGoogleAccount(email: String, userID: Int) {
+        launchOnUI { mRepo.removeGoogleAccount(email, userID) }
     }
 }

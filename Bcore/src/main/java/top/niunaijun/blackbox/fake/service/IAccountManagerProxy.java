@@ -1,6 +1,7 @@
 package top.niunaijun.blackbox.fake.service;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.accounts.IAccountManagerResponse;
 import android.content.Context;
 import android.os.Bundle;
@@ -233,11 +234,23 @@ public class IAccountManagerProxy extends BinderInvocationStub {
 
     @ProxyMethod("getAuthToken")
     public static class getAuthToken extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            Account account = (Account) args[1];
+            if (account != null && "com.google".equals(account.type)) {
+                // If this account is registered in the sandbox, proxy to real system
+                // so we get actual OAuth tokens rather than a stub response.
+                Account[] sandbox = BAccountManager.get().getAccountsAsUser("com.google");
+                if (sandbox != null) {
+                    for (Account sa : sandbox) {
+                        if (sa.name.equals(account.name)) {
+                            return method.invoke(who, args);
+                        }
+                    }
+                }
+            }
             BAccountManager.get().getAuthToken((IAccountManagerResponse) args[0],
-                    (Account) args[1],
+                    account,
                     (String) args[2],
                     (boolean) args[3],
                     (boolean) args[4],
@@ -248,30 +261,70 @@ public class IAccountManagerProxy extends BinderInvocationStub {
 
     @ProxyMethod("addAccount")
     public static class addAccount extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            String accountType = (String) args[1];
+            if ("com.google".equals(accountType)) {
+                // Forward to real system to show Google's account UI.
+                // Wrap the response so we also persist the account in BAccountManager.
+                IAccountManagerResponse original = (IAccountManagerResponse) args[0];
+                args[0] = new IAccountManagerResponse.Stub() {
+                    @Override
+                    public void onResult(Bundle value) throws RemoteException {
+                        if (value != null) {
+                            String name = value.getString(AccountManager.KEY_ACCOUNT_NAME);
+                            String type = value.getString(AccountManager.KEY_ACCOUNT_TYPE);
+                            if (name != null && type != null) {
+                                BAccountManager.get().addAccountExplicitly(
+                                        new Account(name, type), null, null);
+                            }
+                        }
+                        if (original != null) original.onResult(value);
+                    }
+                    @Override
+                    public void onError(int errorCode, String errorMessage) throws RemoteException {
+                        if (original != null) original.onError(errorCode, errorMessage);
+                    }
+                };
+                return method.invoke(who, args);
+            }
             BAccountManager.get().addAccount((IAccountManagerResponse) args[0],
-                    (String) args[1],
-                    (String) args[2],
-                    (String[]) args[3],
-                    (boolean) args[4],
-                    (Bundle) args[5]);
+                    accountType, (String) args[2], (String[]) args[3],
+                    (boolean) args[4], (Bundle) args[5]);
             return 0;
         }
     }
 
     @ProxyMethod("addAccountAsUser")
     public static class addAccountAsUser extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            String accountType = (String) args[1];
+            if ("com.google".equals(accountType)) {
+                IAccountManagerResponse original = (IAccountManagerResponse) args[0];
+                args[0] = new IAccountManagerResponse.Stub() {
+                    @Override
+                    public void onResult(Bundle value) throws RemoteException {
+                        if (value != null) {
+                            String name = value.getString(AccountManager.KEY_ACCOUNT_NAME);
+                            String type = value.getString(AccountManager.KEY_ACCOUNT_TYPE);
+                            if (name != null && type != null) {
+                                BAccountManager.get().addAccountExplicitly(
+                                        new Account(name, type), null, null);
+                            }
+                        }
+                        if (original != null) original.onResult(value);
+                    }
+                    @Override
+                    public void onError(int errorCode, String errorMessage) throws RemoteException {
+                        if (original != null) original.onError(errorCode, errorMessage);
+                    }
+                };
+                return method.invoke(who, args);
+            }
             BAccountManager.get().addAccountAsUser((IAccountManagerResponse) args[0],
-                    (String) args[1],
-                    (String) args[2],
-                    (String[]) args[3],
-                    (boolean) args[4],
-                    (Bundle) args[5]);
+                    accountType, (String) args[2], (String[]) args[3],
+                    (boolean) args[4], (Bundle) args[5]);
             return 0;
         }
     }

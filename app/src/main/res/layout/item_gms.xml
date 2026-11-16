@@ -1,30 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
         android:layout_marginHorizontal="8dp"
         android:layout_marginVertical="4dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/selectableItemBackground">
 
-    <TextView
-            android:id="@+id/tvTitle"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+    <!-- User label + GMS toggle row -->
+    <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:textColor="@color/primary_text"
-            android:textSize="16sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            tools:text="User1" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
-            android:id="@+id/checkbox"
-            android:layout_width="wrap_content"
+        <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:textColor="@color/primary_text"
+                android:textSize="16sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="User 0" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/checkbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="12dp" />
+    </LinearLayout>
+
+    <!-- Google account row — only visible when GMS is enabled -->
+    <LinearLayout
+            android:id="@+id/accountRow"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="12dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone">
+
+        <TextView
+                android:id="@+id/tvGoogleAccount"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:textColor="@color/secondary_text"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="user@gmail.com" />
+
+        <TextView
+                android:id="@+id/btnAddAccount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/add_google_account"
+                android:textColor="@color/accent"
+                android:textSize="12sp"
+                android:paddingStart="8dp"
+                android:paddingEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+    </LinearLayout>
 
 </LinearLayout>
