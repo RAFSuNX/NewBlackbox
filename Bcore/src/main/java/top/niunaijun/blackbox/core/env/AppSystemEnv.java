@@ -29,9 +29,15 @@ public class AppSystemEnv {
 
         
         sSystemPackages.add("com.google.android.inputmethod.latin");
-        
 
-        
+        // GMS: forward to real system so sign-in UI uses actual certs/DEX.
+        // Running these in the sandbox fails: "classes.dex not found" because
+        // the GMS stub installed by GMS Manager has no runnable DEX of its own.
+        sSystemPackages.add("com.android.vending");
+        sSystemPackages.add("com.google.android.gms");
+        sSystemPackages.add("com.google.android.gsf");
+
+
         sSystemPackages.add("com.huawei.webview");
 
         
