@@ -10,9 +10,9 @@ ext {
     targetSdkVersion = 34
 
     minSdk = 21
-    // CI overrides these via -PversionCode and -PversionName Gradle properties
-    versionCode = project.findProperty('versionCode')?.toInteger() ?: 420
-    versionName = project.findProperty('versionName') ?: "4.2.0"
+    // Always set by CI via -PversionCode / -PversionName from the git tag
+    versionCode = project.findProperty('versionCode')?.toInteger() ?: 1
+    versionName = project.findProperty('versionName') ?: "0.0.0"
     xVersion = '1.1.0'
     hiddenApiBypass = '4.3'
 }

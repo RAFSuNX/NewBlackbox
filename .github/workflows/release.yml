@@ -1,9 +1,14 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
   contents: write
@@ -18,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-java@v5
         with:
@@ -25,30 +31,51 @@ jobs:
           java-version: '21'
           cache: gradle
 
-
       - name: Accept SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Compute version from tag
+      - name: Compute next version from latest tag
         id: version
         run: |
-          TAG=${GITHUB_REF_NAME}            # e.g. v4.1.0
-          NAME=${TAG#v}                     # e.g. 4.1.0
-          MAJOR=$(echo $NAME | cut -d. -f1)
-          MINOR=$(echo $NAME | cut -d. -f2)
-          PATCH=$(echo $NAME | cut -d. -f3)
+          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          CURRENT=${LATEST#v}
+          MAJOR=$(echo $CURRENT | cut -d. -f1)
+          MINOR=$(echo $CURRENT | cut -d. -f2)
+          PATCH=$(echo $CURRENT | cut -d. -f3)
+
+          case "${{ github.event.inputs.bump }}" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+          esac
+
+          NAME="${MAJOR}.${MINOR}.${PATCH}"
           CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
-          echo "version_name=$NAME" >> $GITHUB_OUTPUT
-          echo "version_code=$CODE" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          TAG="v${NAME}"
+
+          echo "version_name=$NAME"   >> $GITHUB_OUTPUT
+          echo "version_code=$CODE"   >> $GITHUB_OUTPUT
+          echo "tag=$TAG"             >> $GITHUB_OUTPUT
+          echo "prev_tag=$LATEST"     >> $GITHUB_OUTPUT
+          echo "Next: $TAG (code $CODE) bumped from $LATEST"
+
+      - name: Tag the release commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
 
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/blackbox-release.jks
           echo "KEYSTORE_PATH=$RUNNER_TEMP/blackbox-release.jks" >> $GITHUB_ENV
-          echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}"     >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}"               >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}"         >> $GITHUB_ENV
 
       - name: Build signed release APKs
         run: |
@@ -58,25 +85,24 @@ jobs:
             -PversionCode="${{ steps.version.outputs.version_code }}"
 
       - name: Collect APKs
-        id: apks
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/*.apk dist/
-          ls dist/
-          echo "files=$(ls dist/*.apk | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_OUTPUT
+          ls -lh dist/
 
-      - name: Generate release notes
-        id: notes
+      - name: Generate changelog
+        id: changelog
         run: |
-          PREV=$(git tag --sort=-version:refname | grep -v "^${{ steps.version.outputs.tag }}$" | head -1)
-          if [ -n "$PREV" ]; then
-            NOTES=$(git log ${PREV}..${{ steps.version.outputs.tag }} --pretty="- %s" --no-merges)
+          PREV="${{ steps.version.outputs.prev_tag }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse "$PREV" >/dev/null 2>&1; then
+            NOTES=$(git log ${PREV}..HEAD --pretty="- %s" --no-merges | grep -v "^- Merge")
           else
             NOTES=$(git log --pretty="- %s" --no-merges | head -20)
           fi
           echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES"     >> $GITHUB_OUTPUT
+          echo "EOF"        >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -85,29 +111,29 @@ jobs:
           name: "BlackBox ${{ steps.version.outputs.version_name }}"
           body: |
             ## What's Changed
-            ${{ steps.notes.outputs.notes }}
+            ${{ steps.changelog.outputs.notes }}
 
             ---
-            **Version:** `${{ steps.version.outputs.version_name }}` (code `${{ steps.version.outputs.version_code }}`)
-            **Min SDK:** Android 5.0 (API 21)
-            **Target SDK:** Android 14 (API 34)
+            **Version:** `${{ steps.version.outputs.version_name }}` · code `${{ steps.version.outputs.version_code }}`
+            **Min SDK:** Android 5.0 (API 21) · **Target SDK:** Android 14 (API 34)
           files: dist/*.apk
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version_name, '-') }}
 
-      - name: Send signed APKs to Telegram
+      - name: Send to Telegram
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VER="${{ steps.version.outputs.version_name }}"
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          URL="https://github.com/${{ github.repository }}/releases/tag/$TAG"
           for APK in dist/*.apk; do
             [ -f "$APK" ] || continue
             RESPONSE=$(curl -s -F document=@"$APK" \
               -F chat_id="$TELEGRAM_CHAT_ID" \
-              -F caption="$(printf '[RELEASE v%s SIGNED]\n%s\n\n%s' "$VER" "$(basename $APK)" "$RELEASE_URL")" \
+              -F caption="$(printf '[RELEASE %s SIGNED]\n%s\n\n%s' "$TAG" "$(basename $APK)" "$URL")" \
               https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument)
             MSG_ID=$(echo $RESPONSE | jq -r '.result.message_id // empty')
-            [ -n "$MSG_ID" ] && curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
+            [ -n "$MSG_ID" ] && curl -s -X POST \
+              "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/pinChatMessage" \
               -d chat_id="$TELEGRAM_CHAT_ID" -d message_id="$MSG_ID" > /dev/null
           done
