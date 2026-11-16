@@ -128,27 +128,47 @@ public class IPackageManagerProxy extends BinderInvocationStub {
 
     @ProxyMethod("getPackageInfo")
     public static class GetPackageInfo extends MethodHook {
+        // GMS packages that need real signatures from the host system so that
+        // GoogleSignatureVerifier passes and Google Sign-In can work.
+        private static final java.util.Set<String> GMS_PACKAGES = new java.util.HashSet<>(
+                java.util.Arrays.asList(
+                        "com.android.vending",
+                        "com.google.android.gms",
+                        "com.google.android.gsf"
+                )
+        );
+
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String packageName = (String) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
-            
-            
-            if ("com.android.vending".equals(packageName)) {
-                return createFakeGooglePlayServicesPackageInfo();
+
+            if (GMS_PACKAGES.contains(packageName)) {
+                // Forward to real system PackageManager so we return genuine
+                // signing certificates. Without real signatures GoogleSignatureVerifier
+                // returns "package info is not set correctly" and blocks sign-in.
+                try {
+                    return BlackBoxCore.getContext().getPackageManager()
+                            .getPackageInfo(packageName, flags | PackageManager.GET_SIGNATURES);
+                } catch (PackageManager.NameNotFoundException e) {
+                    // GMS not installed on host — fall through to return null
+                    return null;
+                }
             }
-            
-            PackageInfo packageInfo = BlackBoxCore.getBPackageManager().getPackageInfo(packageName, flags, BlackBoxCore.getUserId());
+
+            PackageInfo packageInfo = BlackBoxCore.getBPackageManager()
+                    .getPackageInfo(packageName, flags, BlackBoxCore.getUserId());
             if (packageInfo != null) {
-                
-                if (packageInfo.requestedPermissions != null && packageInfo.requestedPermissionsFlags != null) {
+                if (packageInfo.requestedPermissions != null
+                        && packageInfo.requestedPermissionsFlags != null) {
                     for (int i = 0; i < packageInfo.requestedPermissions.length; i++) {
                         String perm = packageInfo.requestedPermissions[i];
                         if (perm != null && (perm.equals(android.Manifest.permission.RECORD_AUDIO)
                                 || perm.equals("android.permission.FOREGROUND_SERVICE_MICROPHONE")
                                 || perm.equals(android.Manifest.permission.MODIFY_AUDIO_SETTINGS)
                                 || perm.equals(android.Manifest.permission.CAPTURE_AUDIO_OUTPUT))) {
-                            packageInfo.requestedPermissionsFlags[i] |= PackageInfo.REQUESTED_PERMISSION_GRANTED;
+                            packageInfo.requestedPermissionsFlags[i] |=
+                                    PackageInfo.REQUESTED_PERMISSION_GRANTED;
                         }
                     }
                 }
@@ -159,22 +179,23 @@ public class IPackageManagerProxy extends BinderInvocationStub {
             }
             return null;
         }
-        
-        private PackageInfo createFakeGooglePlayServicesPackageInfo() {
-            PackageInfo packageInfo = new PackageInfo();
-            packageInfo.packageName = "com.android.vending";
-            packageInfo.versionName = "33.8.16-21";
-            packageInfo.versionCode = 83381621;
-            
-            ApplicationInfo appInfo = new ApplicationInfo();
-            appInfo.packageName = "com.android.vending";
-            appInfo.name = "Google Play Store";
-            appInfo.flags = ApplicationInfo.FLAG_SYSTEM;
-            appInfo.uid = 10001; 
-            packageInfo.applicationInfo = appInfo;
-            
-            Slog.d(TAG, "GetPackageInfo: Providing fake Google Play Services info");
-            return packageInfo;
+    }
+
+    @ProxyMethod("checkSignatures")
+    public static class CheckSignatures extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            // Inside the sandbox all intra-GMS signature checks must pass.
+            // The real verification happens at the network level (Play Integrity).
+            return PackageManager.SIGNATURE_MATCH; // = 0
+        }
+    }
+
+    @ProxyMethod("checkUidSignatures")
+    public static class CheckUidSignatures extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return PackageManager.SIGNATURE_MATCH;
         }
     }
 

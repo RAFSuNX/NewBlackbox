@@ -817,18 +817,27 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     private PackageInfo createFallbackPackageInfo(String packageName, int flags, int userId) {
-        Log.w(TAG, "Creating fallback PackageInfo for " + packageName);
+        // For GMS packages, prefer the real host system info so signatures are genuine
+        if ("com.android.vending".equals(packageName)
+                || "com.google.android.gms".equals(packageName)
+                || "com.google.android.gsf".equals(packageName)) {
+            try {
+                return BlackBoxCore.getContext().getPackageManager()
+                        .getPackageInfo(packageName, flags | android.content.pm.PackageManager.GET_SIGNATURES);
+            } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+            }
+        }
         PackageInfo info = new PackageInfo();
         info.packageName = packageName;
-        info.versionCode = 1; 
-        info.versionName = "1.0"; 
+        info.versionCode = 1;
+        info.versionName = "1.0";
         info.applicationInfo = createFallbackApplicationInfo(packageName, flags, userId);
-        info.firstInstallTime = System.currentTimeMillis(); 
-        info.lastUpdateTime = System.currentTimeMillis(); 
-        info.installLocation = 0; 
-        info.gids = new int[]{}; 
-        info.splitNames = new String[]{}; 
-        info.signatures = new Signature[]{}; 
+        info.firstInstallTime = System.currentTimeMillis();
+        info.lastUpdateTime = System.currentTimeMillis();
+        info.installLocation = 0;
+        info.gids = new int[]{};
+        info.splitNames = new String[]{};
+        info.signatures = new Signature[]{};
         return info;
     }
 }
