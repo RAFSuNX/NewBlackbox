@@ -128,32 +128,18 @@ public class IPackageManagerProxy extends BinderInvocationStub {
 
     @ProxyMethod("getPackageInfo")
     public static class GetPackageInfo extends MethodHook {
-        // GMS packages that need real signatures from the host system so that
-        // GoogleSignatureVerifier passes and Google Sign-In can work.
-        private static final java.util.Set<String> GMS_PACKAGES = new java.util.HashSet<>(
-                java.util.Arrays.asList(
-                        "com.android.vending",
-                        "com.google.android.gms",
-                        "com.google.android.gsf"
-                )
-        );
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String packageName = (String) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
 
-            if (GMS_PACKAGES.contains(packageName)) {
-                // Forward to real system PackageManager so we return genuine
-                // signing certificates. Without real signatures GoogleSignatureVerifier
-                // returns "package info is not set correctly" and blocks sign-in.
-                try {
-                    return BlackBoxCore.getContext().getPackageManager()
-                            .getPackageInfo(packageName, flags | PackageManager.GET_SIGNATURES);
-                } catch (PackageManager.NameNotFoundException e) {
-                    // GMS not installed on host — fall through to return null
-                    return null;
-                }
+            // isOpenPackage covers GMS packages (com.android.vending, com.google.android.gms,
+            // com.google.android.gsf) added in AppSystemEnv. method.invoke(who, args) calls
+            // the real IPackageManager directly — no hook re-entry, real signatures returned.
+            // Previously used getContext().getPackageManager() here which IS hooked,
+            // causing infinite recursion → StackOverflowError → black screen.
+            if (AppSystemEnv.isOpenPackage(packageName)) {
+                return method.invoke(who, args);
             }
 
             PackageInfo packageInfo = BlackBoxCore.getBPackageManager()
@@ -173,9 +159,6 @@ public class IPackageManagerProxy extends BinderInvocationStub {
                     }
                 }
                 return packageInfo;
-            }
-            if (AppSystemEnv.isOpenPackage(packageName)) {
-                return method.invoke(who, args);
             }
             return null;
         }
