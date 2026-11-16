@@ -343,11 +343,11 @@ class AppsFragment : Fragment() {
             val isNewClone = BlackBoxCore.get().users.none { it.id == userID }
             if (isNewClone) {
                 viewBinding.stateView.showEmpty()
-                // Show clone hint in empty view if StateView supports custom text
-                return
+            } else {
+                viewBinding.stateView.showLoading()
+                viewModel.getInstalledApps(userID)
             }
-            viewBinding.stateView.showLoading()
-            viewModel.getInstalledApps(userID)
+
             viewModel.appsLiveData.observe(viewLifecycleOwner) {
                 try {
                     if (it != null) {
@@ -363,6 +363,8 @@ class AppsFragment : Fragment() {
                 }
             }
 
+            // Always observe resultLiveData — even on new clone slides so install
+            // results (and the subsequent reload) work when the first app is installed
             viewModel.resultLiveData.observe(viewLifecycleOwner) {
                 try {
                     if (!TextUtils.isEmpty(it)) {
