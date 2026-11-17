@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  # Manual: pick patch/minor/major and it auto-increments + tags
   workflow_dispatch:
     inputs:
       bump:
@@ -9,6 +10,10 @@ on:
         default: 'patch'
         type: choice
         options: [patch, minor, major]
+  # Automatic: push a tag like v4.5.0 and it builds + releases that exact version
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
@@ -34,35 +39,45 @@ jobs:
       - name: Accept SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Compute next version from latest tag
+      - name: Compute version
         id: version
         run: |
-          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          if [ -z "$LATEST" ]; then
-            LATEST="v0.0.0"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag push: use the pushed tag directly
+            TAG="${{ github.ref_name }}"
+            NAME="${TAG#v}"
+          else
+            # workflow_dispatch: read latest tag and bump it
+            LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+            [ -z "$LATEST" ] && LATEST="v0.0.0"
+            CURRENT="${LATEST#v}"
+            MAJOR=$(echo $CURRENT | cut -d. -f1)
+            MINOR=$(echo $CURRENT | cut -d. -f2)
+            PATCH=$(echo $CURRENT | cut -d. -f3)
+            case "${{ github.event.inputs.bump }}" in
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              *)     PATCH=$((PATCH+1)) ;;
+            esac
+            NAME="${MAJOR}.${MINOR}.${PATCH}"
+            TAG="v${NAME}"
           fi
-          CURRENT=${LATEST#v}
-          MAJOR=$(echo $CURRENT | cut -d. -f1)
-          MINOR=$(echo $CURRENT | cut -d. -f2)
-          PATCH=$(echo $CURRENT | cut -d. -f3)
 
-          case "${{ github.event.inputs.bump }}" in
-            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH+1)) ;;
-          esac
-
-          NAME="${MAJOR}.${MINOR}.${PATCH}"
+          MAJOR=$(echo $NAME | cut -d. -f1)
+          MINOR=$(echo $NAME | cut -d. -f2)
+          PATCH=$(echo $NAME | cut -d. -f3)
           CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
-          TAG="v${NAME}"
 
-          echo "version_name=$NAME"   >> $GITHUB_OUTPUT
-          echo "version_code=$CODE"   >> $GITHUB_OUTPUT
-          echo "tag=$TAG"             >> $GITHUB_OUTPUT
-          echo "prev_tag=$LATEST"     >> $GITHUB_OUTPUT
-          echo "Next: $TAG (code $CODE) bumped from $LATEST"
+          PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG}$" | head -1)
 
-      - name: Tag the release commit
+          echo "version_name=$NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$CODE" >> $GITHUB_OUTPUT
+          echo "tag=$TAG"           >> $GITHUB_OUTPUT
+          echo "prev_tag=${PREV:-}"  >> $GITHUB_OUTPUT
+          echo "Next: $TAG (code $CODE)"
+
+      - name: Create and push tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -85,17 +100,13 @@ jobs:
             -PversionCode="${{ steps.version.outputs.version_code }}"
 
       - name: Collect APKs
-        run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/release/*.apk dist/
-          ls -lh dist/
+        run: mkdir -p dist && cp app/build/outputs/apk/release/*.apk dist/
 
       - name: Generate changelog
         id: changelog
         run: |
           PREV="${{ steps.version.outputs.prev_tag }}"
-          TAG="${{ steps.version.outputs.tag }}"
-          if git rev-parse "$PREV" >/dev/null 2>&1; then
+          if [ -n "$PREV" ] && git rev-parse "$PREV" >/dev/null 2>&1; then
             NOTES=$(git log ${PREV}..HEAD --pretty="- %s" --no-merges | grep -v "^- Merge")
           else
             NOTES=$(git log --pretty="- %s" --no-merges | head -20)
