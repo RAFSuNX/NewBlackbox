@@ -7,6 +7,7 @@
         tools:ignore="QueryAllPackagesPermission" />
 
     
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
@@ -28,6 +29,10 @@
             android:exported="false" />
         <activity android:name=".view.setting.SettingActivity" />
         <activity android:name=".view.gms.GmsManagerActivity" />
+        <activity
+            android:name=".view.auth.GoogleAuthActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".view.main.WelcomeActivity"
             android:exported="true"
