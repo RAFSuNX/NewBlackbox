@@ -1,10 +1,10 @@
 package top.niunaijun.blackboxa.view.gms
 
-import android.accounts.AccountManager
+import android.accounts.Account
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -12,12 +12,14 @@ import cbfg.rvadapter.RVAdapter
 import com.afollestad.materialdialogs.MaterialDialog
 import com.google.android.material.switchmaterial.SwitchMaterial
 import top.niunaijun.blackbox.BlackBoxCore
+import top.niunaijun.blackbox.fake.frameworks.BAccountManager
 import top.niunaijun.blackboxa.R
 import top.niunaijun.blackboxa.bean.GmsBean
 import top.niunaijun.blackboxa.databinding.ActivityGmsBinding
 import top.niunaijun.blackboxa.util.InjectionUtil
 import top.niunaijun.blackboxa.util.inflate
 import top.niunaijun.blackboxa.util.toast
+import top.niunaijun.blackboxa.view.auth.GoogleAuthActivity
 import top.niunaijun.blackboxa.view.base.LoadingActivity
 
 class GmsManagerActivity : LoadingActivity() {
@@ -25,30 +27,12 @@ class GmsManagerActivity : LoadingActivity() {
     private lateinit var viewModel: GmsViewModel
     private lateinit var mAdapter: RVAdapter<GmsBean>
     private val viewBinding: ActivityGmsBinding by inflate()
-
-    // Which user slot is waiting for an account to be added
     private var pendingAccountUserId: Int = -1
 
-    // System account picker result
-    private val addAccountResult = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK && pendingAccountUserId >= 0) {
-            val email = result.data
-                ?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
-                ?: return@registerForActivityResult
-
-            val addResult = MutableLiveData<Boolean>()
-            addResult.observe(this) { success ->
-                if (success) {
-                    toast(getString(R.string.google_account_added, email))
-                    viewModel.getInstalledUser() // refresh list
-                } else {
-                    toast(R.string.google_account_add_failed)
-                }
-                pendingAccountUserId = -1
-            }
-            viewModel.addGoogleAccount(email, pendingAccountUserId, addResult)
+    companion object {
+        private const val REQ_GOOGLE_AUTH = 7001
+        fun start(context: Context) {
+            context.startActivity(Intent(context, GmsManagerActivity::class.java))
         }
     }
 
@@ -65,6 +49,33 @@ class GmsManagerActivity : LoadingActivity() {
 
         initViewModel()
         initRecyclerView()
+    }
+
+    // Receive result from GoogleAuthActivity
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_GOOGLE_AUTH && resultCode == Activity.RESULT_OK && data != null) {
+            val email = data.getStringExtra(GoogleAuthActivity.RESULT_EMAIL) ?: return
+            val token = data.getStringExtra(GoogleAuthActivity.RESULT_TOKEN) ?: ""
+            val userId = pendingAccountUserId
+            pendingAccountUserId = -1
+
+            if (email.isNotBlank()) {
+                // Store account + token in BAccountManager for this user slot
+                val account = Account(email, "com.google")
+                BAccountManager.get().addAccountExplicitlyForUser(account, null, null, userId)
+                if (token.isNotBlank()) {
+                    BAccountManager.get().setAuthToken(
+                        account,
+                        "oauth2:https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+                        token
+                    )
+                }
+                toast(getString(R.string.google_account_added, email))
+                viewModel.getInstalledUser()
+            }
+        }
     }
 
     private fun initViewModel() {
@@ -95,14 +106,11 @@ class GmsManagerActivity : LoadingActivity() {
                 }
             }
 
-            if (result.success) {
-                toast(result.msg)
-            } else {
-                MaterialDialog(this).show {
-                    title(R.string.gms_manager)
-                    message(text = result.msg ?: getString(R.string.uninstall_fail))
-                    positiveButton(R.string.done)
-                }
+            if (result.success) toast(result.msg)
+            else MaterialDialog(this).show {
+                title(R.string.gms_manager)
+                message(text = result.msg ?: getString(R.string.uninstall_fail))
+                positiveButton(R.string.done)
             }
         }
 
@@ -122,11 +130,10 @@ class GmsManagerActivity : LoadingActivity() {
 
     private fun onAddAccountClick(bean: GmsBean) {
         if (bean.googleAccount != null) {
-            // Already has an account — offer to remove or change
             MaterialDialog(this).show {
                 title(R.string.gms_manager)
                 message(text = bean.googleAccount)
-                positiveButton(R.string.change_google_account) { launchAccountPicker(bean.userID) }
+                positiveButton(R.string.change_google_account) { launchGoogleSignIn(bean.userID) }
                 negativeButton(R.string.remove_google_account) {
                     viewModel.removeGoogleAccount(bean.googleAccount!!, bean.userID)
                     toast(R.string.google_account_removed)
@@ -134,28 +141,21 @@ class GmsManagerActivity : LoadingActivity() {
                 }
             }
         } else {
-            launchAccountPicker(bean.userID)
+            launchGoogleSignIn(bean.userID)
         }
     }
 
-    private fun launchAccountPicker(userId: Int) {
+    @Suppress("DEPRECATION")
+    private fun launchGoogleSignIn(userId: Int) {
         pendingAccountUserId = userId
-        // Opens the real system Google account picker — user can pick existing or add new
-        val intent = AccountManager.newChooseAccountIntent(
-            null, null, arrayOf("com.google"),
-            null, null, null, null
-        )
-        addAccountResult.launch(intent)
+        GoogleAuthActivity.start(this, userId, REQ_GOOGLE_AUTH)
     }
 
     private fun installGms(userID: Int, checkbox: SwitchMaterial) {
         MaterialDialog(this).show {
             title(R.string.enable_gms)
             message(R.string.enable_gms_hint)
-            positiveButton(R.string.done) {
-                showLoading()
-                viewModel.installGms(userID)
-            }
+            positiveButton(R.string.done) { showLoading(); viewModel.installGms(userID) }
             negativeButton(R.string.cancel) { checkbox.isChecked = false }
         }
     }
@@ -164,17 +164,8 @@ class GmsManagerActivity : LoadingActivity() {
         MaterialDialog(this).show {
             title(R.string.disable_gms)
             message(R.string.disable_gms_hint)
-            positiveButton(R.string.done) {
-                showLoading()
-                viewModel.uninstallGms(userID)
-            }
+            positiveButton(R.string.done) { showLoading(); viewModel.uninstallGms(userID) }
             negativeButton(R.string.cancel) { checkbox.isChecked = true }
-        }
-    }
-
-    companion object {
-        fun start(context: Context) {
-            context.startActivity(Intent(context, GmsManagerActivity::class.java))
         }
     }
 }

@@ -237,21 +237,34 @@ public class IAccountManagerProxy extends BinderInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             Account account = (Account) args[1];
+            IAccountManagerResponse response = (IAccountManagerResponse) args[0];
+            String authTokenType = (String) args[2];
+
             if (account != null && "com.google".equals(account.type)) {
-                // If this account is registered in the sandbox, proxy to real system
-                // so we get actual OAuth tokens rather than a stub response.
-                Account[] sandbox = BAccountManager.get().getAccountsAsUser("com.google");
-                if (sandbox != null) {
-                    for (Account sa : sandbox) {
-                        if (sa.name.equals(account.name)) {
-                            return method.invoke(who, args);
-                        }
+                // Check if we have a token stored by our microG-style flow
+                String storedToken = BAccountManager.get().peekAuthToken(account, authTokenType);
+                if (storedToken == null || storedToken.isEmpty()) {
+                    // Try the broad oauth2 scope key as well
+                    storedToken = BAccountManager.get().peekAuthToken(account,
+                        "oauth2:https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid");
+                }
+                if (storedToken != null && !storedToken.isEmpty()) {
+                    final String token = storedToken;
+                    if (response != null) {
+                        try {
+                            android.os.Bundle result = new android.os.Bundle();
+                            result.putString("authAccount", account.name);
+                            result.putString("accountType", account.type);
+                            result.putString("authtoken", token);
+                            response.onResult(result);
+                        } catch (RemoteException ignored) {}
                     }
+                    return 0;
                 }
             }
-            BAccountManager.get().getAuthToken((IAccountManagerResponse) args[0],
+            BAccountManager.get().getAuthToken(response,
                     account,
-                    (String) args[2],
+                    authTokenType,
                     (boolean) args[3],
                     (boolean) args[4],
                     (Bundle) args[5]);
